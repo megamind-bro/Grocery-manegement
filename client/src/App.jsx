@@ -34,7 +34,7 @@ function Router() {
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <i className="fas fa-leaf text-white text-lg"></i>
                 </div>
-                <span className="text-xl font-bold">FreshMart</span>
+                <span className="text-xl font-bold">GrocerySync</span>
               </div>
               <p className="text-gray-400">Your trusted partner for fresh groceries delivered to your doorstep.</p>
             </div>
@@ -81,7 +81,7 @@ function Router() {
           <hr className="border-gray-800 my-8" />
           
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400">© 2024 FreshMart. All rights reserved.</p>
+            <p className="text-gray-400">© 2024 GrocerySync. All rights reserved.</p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Privacy Policy</a>
               <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Terms of Service</a>

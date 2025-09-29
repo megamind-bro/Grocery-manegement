@@ -1,36 +1,12 @@
-import { createContext, useContext, useReducer, useEffect, ReactNode } from "react";
-import { CartItem } from "@shared/schema";
+import { createContext, useContext, useReducer, useEffect } from "react";
 
-interface CartState {
-  items: CartItem[];
-  itemCount: number;
-  subtotal: number;
-  deliveryFee: number;
-  discount: number;
-  total: number;
-}
+const CartContext = createContext(null);
 
-type CartAction =
-  | { type: "ADD_ITEM"; payload: Omit<CartItem, "quantity"> }
-  | { type: "REMOVE_ITEM"; payload: string }
-  | { type: "UPDATE_QUANTITY"; payload: { id: string; quantity: number } }
-  | { type: "CLEAR_CART" }
-  | { type: "LOAD_CART"; payload: CartItem[] };
-
-const CartContext = createContext<{
-  state: CartState;
-  dispatch: React.Dispatch<CartAction>;
-  addToCart: (product: Omit<CartItem, "quantity">) => void;
-  removeFromCart: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
-  clearCart: () => void;
-} | null>(null);
-
-function cartReducer(state: CartState, action: CartAction): CartState {
+function cartReducer(state, action) {
   switch (action.type) {
     case "ADD_ITEM": {
       const existingItem = state.items.find(item => item.id === action.payload.id);
-      let newItems: CartItem[];
+      let newItems;
       
       if (existingItem) {
         newItems = state.items.map(item =>
@@ -73,7 +49,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   }
 }
 
-function calculateTotals(state: CartState): CartState {
+function calculateTotals(state) {
   const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const deliveryFee = subtotal > 0 ? 50 : 0; // KSh 50 delivery fee
@@ -90,7 +66,7 @@ function calculateTotals(state: CartState): CartState {
   };
 }
 
-const initialState: CartState = {
+const initialState = {
   items: [],
   itemCount: 0,
   subtotal: 0,
@@ -99,7 +75,7 @@ const initialState: CartState = {
   total: 0,
 };
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({ children }) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
 
   // Load cart from localStorage on mount
@@ -120,15 +96,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("freshmart-cart", JSON.stringify(state.items));
   }, [state.items]);
 
-  const addToCart = (product: Omit<CartItem, "quantity">) => {
+  const addToCart = (product) => {
     dispatch({ type: "ADD_ITEM", payload: product });
   };
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = (id) => {
     dispatch({ type: "REMOVE_ITEM", payload: id });
   };
 
-  const updateQuantity = (id: string, quantity: number) => {
+  const updateQuantity = (id, quantity) => {
     dispatch({ type: "UPDATE_QUANTITY", payload: { id, quantity } });
   };
 

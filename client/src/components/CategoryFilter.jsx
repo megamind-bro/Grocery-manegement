@@ -10,12 +10,7 @@ const categories = [
   { id: "snacks", name: "Snacks", icon: "🍪" },
 ];
 
-interface CategoryFilterProps {
-  selectedCategory: string;
-  onCategoryChange: (category: string) => void;
-}
-
-export default function CategoryFilter({ selectedCategory, onCategoryChange }: CategoryFilterProps) {
+export default function CategoryFilter({ selectedCategory, onCategoryChange }) {
   return (
     <div className="py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
