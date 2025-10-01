@@ -8,3 +8,4 @@ MIGRATION_LOG.md
 .env
 .gitignore
 server/venv
+.vscode
