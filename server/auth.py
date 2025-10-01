@@ -17,7 +17,7 @@ except ImportError:  # optional dependency during local dev
     credentials = None
 
 
-_firebase_initialized = False
+firebase_initialized = False
 
 
 def _init_firebase() -> None:

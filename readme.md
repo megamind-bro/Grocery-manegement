@@ -1,8 +1,8 @@
-# grocerysync - E-commerce Grocery Application
+# Grocerysync - E-commerce Grocery Application
 
 ## Overview
 
-grocerysync is a full-stack e-commerce grocery application built with modern web technologies. The application provides a complete online shopping experience for fresh groceries, featuring product browsing, cart management, checkout process, and administrative dashboard capabilities. It's designed as a single-page application with a React frontend and a Python Flask backend, utilizing SQLite for data persistence with Firebase for authentication and backups, and supporting M-Pesa payment integration for Kenyan customers.
+Grocerysync is a full-stack e-commerce grocery application built with modern web technologies. The application provides a complete online shopping experience for fresh groceries, featuring product browsing, cart management, checkout process, and administrative dashboard capabilities. It's designed as a single-page application with a React frontend and a Python Flask backend, utilizing SQLite for data persistence with Firebase for authentication and backups, and supporting M-Pesa payment integration for Kenyan customers.
 
 ## User Preferences
 

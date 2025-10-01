@@ -4,5 +4,7 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+MIGRATION_LOG.md
 .env
 .gitignore
+server/venv
