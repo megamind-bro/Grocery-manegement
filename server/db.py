@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from .config import config
 
@@ -34,7 +34,7 @@ class Product(Base):
     image: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(255), nullable=False)
     size: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    in_stock: Mapped[bool] = mapped_column(Integer, nullable=False, default=1)
+    in_stock: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

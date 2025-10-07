@@ -6,4 +6,5 @@ pandas==2.2.3
 httpx==0.27.2
 firebase-admin==6.6.0
 python-dotenv==1.0.1
+anyio==4.4.0
 

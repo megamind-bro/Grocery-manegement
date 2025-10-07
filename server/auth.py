@@ -21,8 +21,8 @@ firebase_initialized = False
 
 
 def _init_firebase() -> None:
-    global _firebase_initialized
-    if _firebase_initialized:
+    global firebase_initialized
+    if firebase_initialized:
         return
     if firebase_admin is None:
         return
@@ -30,7 +30,7 @@ def _init_firebase() -> None:
     if cred_path and not firebase_admin._apps:
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
-        _firebase_initialized = True
+        firebase_initialized = True
 
 
 def verify_firebase_token(id_token: str) -> Optional[dict]:

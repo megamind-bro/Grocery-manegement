@@ -5,10 +5,10 @@
   "license": "MIT",
   "scripts": {
     "dev:client": "vite",
-    "dev:server": "python3 server/app.py",
+    "dev:server": "cd server && ./venv/bin/python -m server.app",
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
     "build": "vite build",
-    "start": "python3 server/app.py"
+    "start": "cd server && ./venv/bin/python -m server.app"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -94,6 +94,7 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^9.2.1",
     "drizzle-kit": "^0.31.4",
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
