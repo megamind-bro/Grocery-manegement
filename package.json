@@ -4,11 +4,12 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "setup:venv": "cd server && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
     "dev:client": "vite",
-    "dev:server": "cd server && ./venv/bin/python -m server.app",
+    "dev:server": "PYTHONPATH=. ./server/venv/bin/python -m server.app",
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
     "build": "vite build",
-    "start": "cd server && ./venv/bin/python -m server.app"
+    "start": "PYTHONPATH=. ./server/venv/bin/python -m server.app"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

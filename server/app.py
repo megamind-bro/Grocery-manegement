@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from flask import Flask
 
 from .config import config
@@ -28,5 +29,11 @@ def create_app() -> Flask:
 
 app = create_app()
 
+# Run the app when executed directly or as a module
+# When run as: python -m server.app, __name__ will be "server.app"  
+# When run as: python app.py, __name__ will be "__main__"
 if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=config.port, debug=True)
+elif __name__ == "server.app" and "-m" in sys.argv:
+    # Running as module: python -m server.app
     app.run(host="0.0.0.0", port=config.port, debug=True)
