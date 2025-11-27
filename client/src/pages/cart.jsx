@@ -1,4 +1,5 @@
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +7,46 @@ import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck } from "lucide-react";
 
 export default function Cart() {
   const { state, updateQuantity, removeFromCart } = useCart();
+  const [, navigate] = useLocation();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setIsLoggedIn(!!data);
+          if (!data) {
+            navigate("/login");
+          }
+        } else {
+          setIsLoggedIn(false);
+          navigate("/login");
+        }
+      } catch {
+        setIsLoggedIn(false);
+        navigate("/login");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-16">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return null; // Will redirect to login
+  }
 
   if (state.items.length === 0) {
     return (
