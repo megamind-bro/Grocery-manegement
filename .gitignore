@@ -9,3 +9,4 @@ MIGRATION_LOG.md
 .gitignore
 server/venv
 .vscode
+__pycache__/
