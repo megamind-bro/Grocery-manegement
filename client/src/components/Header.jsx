@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { Search, ShoppingCart, User, BarChart3, Leaf } from "lucide-react";
@@ -8,6 +8,17 @@ export default function Header() {
   const [location, navigate] = useLocation();
   const { state } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
+  const [me, setMe] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const data = await res.json();
+        setMe(data);
+      } catch {}
+    })();
+  }, [location]); // Refresh when location changes (e.g., after login)
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -55,7 +66,7 @@ export default function Header() {
               }`}
             >
               <i className="fas fa-home"></i>
-              <span>Home</span>
+              <span>Landing</span>
             </Link>
 
             <Link
@@ -71,21 +82,45 @@ export default function Header() {
               )}
             </Link>
 
-            <Link
-              href="/dashboard"
-              className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <BarChart3 className="h-4 w-4" />
-              <span>Dashboard</span>
-            </Link>
+            {me?.isAdmin && (
+              <Link
+                href="/dashboard"
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>Dashboard</span>
+              </Link>
+            )}
 
-            <Link
-              href="/account"
-              className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <User className="h-4 w-4" />
-              <span>Account</span>
-            </Link>
+            {me && (
+              <Link
+                href="/account"
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <User className="h-4 w-4" />
+                <span>Account</span>
+              </Link>
+            )}
+
+            {me ? (
+              <button
+                onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+                  setMe(null);
+                  navigate("/");
+                }}
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <span>Logout</span>
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <span>Login</span>
+              </Link>
+            )}
           </nav>
         </div>
       </div>
