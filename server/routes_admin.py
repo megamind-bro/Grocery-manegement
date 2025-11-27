@@ -28,8 +28,8 @@ def _require_admin() -> Optional[User]:
     if session.get("is_admin"):
         uid = session.get("user_id")
         if uid:
-            with SessionLocal() as s:
-                u = s.query(User).get(uid)
+            with SessionLocal() as db_session:
+                u = db_session.query(User).get(uid)
                 if u and u.is_admin:
                     return u
     auth = request.headers.get("Authorization", "")
