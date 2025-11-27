@@ -105,7 +105,7 @@ Before running the application, ensure you have the following installed:
 
 ```bash
 git clone <repository-url>
-cd Grocerysyc
+cd GroceryGenius
 ```
 
 ### 2. Install Dependencies
@@ -117,7 +117,15 @@ npm install
 
 #### Backend Dependencies
 ```bash
+# Create virtual environment and install dependencies
+npm run setup:venv
+```
+
+**Alternative (Manual Setup):**
+```bash
 cd server
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cd ..
 ```
@@ -291,12 +299,15 @@ PORT=5001 npm run dev
 
 #### Python Dependencies Issues
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# If you get "externally-managed-environment" error, use virtual environment:
+npm run setup:venv
 
-# Install dependencies
-pip install -r server/requirements.txt
+# Or manually:
+cd server
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cd ..
 ```
 
 #### Node Dependencies Issues
