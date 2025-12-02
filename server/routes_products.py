@@ -27,13 +27,17 @@ def list_products():
             {
                 "id": p.id,
                 "name": p.name,
-                "description": p.description,
-                "price": p.price,
-                "image": p.image,
-                "category": p.category,
-                "size": p.size,
-                "inStock": bool(p.in_stock),
-                "createdAt": p.created_at.isoformat(),
+                "description": p.description or "",
+                "price": float(p.price) if p.price is not None else 0,
+                "image": p.image or "",
+                "category": p.category or "",
+                "size": p.size or "",
+                "stockQuantity": int(p.stock_quantity) if p.stock_quantity is not None else 0,
+                "inStock": bool(p.in_stock) if p.in_stock is not None else False,
+                "deliveryPrice": float(p.delivery_price) if p.delivery_price is not None else 0,
+                "discount": float(p.discount) if p.discount is not None else 0,
+                "createdAt": p.created_at.isoformat() if p.created_at else "",
+                "updatedAt": p.updated_at.isoformat() if p.updated_at else ""
             }
             for p in products
         ])
@@ -48,12 +52,16 @@ def get_product(pid: int):
         return jsonify({
             "id": product.id,
             "name": product.name,
-            "description": product.description,
-            "price": product.price,
-            "image": product.image,
-            "category": product.category,
-            "size": product.size,
-            "inStock": bool(product.in_stock),
-            "createdAt": product.created_at.isoformat(),
+            "description": product.description or "",
+            "price": float(product.price) if product.price is not None else 0,
+            "image": product.image or "",
+            "category": product.category or "",
+            "size": product.size or "",
+            "stockQuantity": int(product.stock_quantity) if product.stock_quantity is not None else 0,
+            "inStock": bool(product.in_stock) if product.in_stock is not None else False,
+            "deliveryPrice": float(product.delivery_price) if product.delivery_price is not None else 0,
+            "discount": float(product.discount) if product.discount is not None else 0,
+            "createdAt": product.created_at.isoformat() if product.created_at else "",
+            "updatedAt": product.updated_at.isoformat() if product.updated_at else ""
         })
 

@@ -180,8 +180,18 @@ def admin_restock_product(product_id: int):
         
         return jsonify({
             "id": product.id,
-            "stockQuantity": product.stock_quantity,
-            "inStock": product.in_stock,
+            "name": product.name,
+            "description": product.description or "",
+            "price": float(product.price) if product.price is not None else 0,
+            "image": product.image or "",
+            "category": product.category or "",
+            "size": product.size or "",
+            "stockQuantity": int(product.stock_quantity) if product.stock_quantity is not None else 0,
+            "inStock": bool(product.in_stock) if product.in_stock is not None else False,
+            "deliveryPrice": float(product.delivery_price) if product.delivery_price is not None else 0,
+            "discount": float(product.discount) if product.discount is not None else 0,
+            "createdAt": product.created_at.isoformat() if product.created_at else "",
+            "updatedAt": product.updated_at.isoformat() if product.updated_at else ""
         })
 
 
