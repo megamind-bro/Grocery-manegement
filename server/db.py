@@ -25,6 +25,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    loyalty_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -47,8 +48,12 @@ class Product(Base):
     image: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(255), nullable=False)
     size: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    stock_quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    delivery_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    discount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     in_stock: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Order(Base):

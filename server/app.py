@@ -11,6 +11,7 @@ from routes_categories import bp_categories
 from routes_orders import bp_orders
 from routes_analytics import bp_analytics
 from routes_auth import bp_auth
+from routes_admin import bp_admin
 
 
 def create_app() -> Flask:
@@ -28,6 +29,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_orders)
     app.register_blueprint(bp_analytics)
     app.register_blueprint(bp_auth)
+    app.register_blueprint(bp_admin)
 
     return app
 

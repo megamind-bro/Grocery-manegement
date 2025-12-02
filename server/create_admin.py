@@ -22,8 +22,41 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import Base, SessionLocal, User, engine
 
 
-def main() -> None:
+def create_admin_user(username=None, email=None, name=None, password=None):
     """Create or update an admin account"""
+    with SessionLocal() as db:
+        # Check if admin user already exists
+        admin = db.query(User).filter(User.username == username).first()
+        
+        if admin:
+            # Update existing admin
+            admin.email = email or admin.email
+            admin.name = name or admin.name
+            if password:
+                admin.password_hash = generate_password_hash(password)
+            admin.is_admin = True
+            message = "updated"
+        else:
+            # Create new admin
+            if not all([username, password, name]):
+                raise ValueError("Username, password, and name are required to create a new admin user")
+                
+            admin = User(
+                username=username,
+                email=email,
+                name=name,
+                password_hash=generate_password_hash(password),
+                is_admin=True
+            )
+            db.add(admin)
+            message = "created"
+        
+        db.commit()
+        print(f"Admin user '{username}' {message} successfully!")
+        return admin
+
+def main() -> None:
+    """Command-line interface for creating an admin account"""
     Base.metadata.create_all(engine)
     
     print("=" * 50)
