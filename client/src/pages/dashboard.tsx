@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +71,9 @@ export default function Dashboard() {
   };
   const [productForm, setProductForm] = useState<ProductFormState>(initialProductForm);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [restockingProduct, setRestockingProduct] = useState<number | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [notificationForm, setNotificationForm] = useState<NotificationFormState>({
     title: "",
     message: "",
@@ -158,27 +161,48 @@ export default function Dashboard() {
   const isUsersLoading = usersQuery.isLoading || usersQuery.isFetching;
 
   const handleProductInputChange = (field: keyof ProductFormState, value: string) => {
+    // Prevent negative values for number fields
+    if ((field === 'price' || field === 'stockQuantity' || field === 'deliveryPrice' || field === 'discount') && value !== '') {
+      const numValue = parseFloat(value);
+      if (numValue < 0) return; // Don't update if negative
+    }
+    
+    // Update image preview when image URL changes
+    if (field === 'image') {
+      setImagePreview(value || null);
+    }
+    
     setProductForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const resetProductForm = () => {
     setProductForm(initialProductForm);
     setEditingProductId(null);
+    setImagePreview(null);
   };
+
+  // Helper function to safely convert product data to form state
+  const productToFormState = (product: any): ProductFormState => ({
+    name: product.name || "",
+    description: product.description || "",
+    price: product.price != null ? String(product.price) : "0",
+    image: product.image || "",
+    category: product.category || "",
+    size: product.size || "",
+    stockQuantity: product.stockQuantity != null ? String(product.stockQuantity) : "0",
+    deliveryPrice: product.deliveryPrice != null ? String(product.deliveryPrice) : "0",
+    discount: product.discount != null ? String(product.discount) : "0"
+  });
 
   const handleEditProduct = (product: any) => {
     setEditingProductId(product.id);
-    setProductForm({
-      name: product.name ?? "",
-      description: product.description ?? "",
-      price: product.price != null ? String(product.price) : "",
-      image: product.image ?? "",
-      category: product.category ?? "",
-      size: product.size ?? "",
-      stockQuantity: product.stockQuantity != null ? String(product.stockQuantity) : "0",
-      deliveryPrice: product.deliveryPrice != null ? String(product.deliveryPrice) : "",
-      discount: product.discount != null ? String(product.discount) : "",
-    });
+    setProductForm(productToFormState(product));
+    setImagePreview(product.image || null);
+    
+    // Scroll to form after a small delay to allow state to update
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleProductSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -188,13 +212,13 @@ export default function Dashboard() {
       const payload = {
         name: productForm.name.trim(),
         description: productForm.description.trim(),
-        price: Number(productForm.price || 0),
+        price: parseFloat(productForm.price) || 0,
         image: productForm.image.trim(),
         category: productForm.category.trim(),
         size: productForm.size.trim(),
-        stockQuantity: Number(productForm.stockQuantity || 0),
-        deliveryPrice: productForm.deliveryPrice ? Number(productForm.deliveryPrice) : null,
-        discount: productForm.discount ? Number(productForm.discount) : null,
+        stockQuantity: parseInt(productForm.stockQuantity, 10) || 0,
+        deliveryPrice: parseFloat(productForm.deliveryPrice) || 0,
+        discount: parseFloat(productForm.discount) || 0,
       };
 
       if (!payload.name || !payload.price || !payload.image || !payload.category) {
@@ -255,19 +279,57 @@ export default function Dashboard() {
       });
       return;
     }
+    
+    setRestockingProduct(productId);
     try {
-      await fetchJson(`/api/admin/products/${productId}/restock`, {
+      const response = await fetchJson(`/api/admin/products/${productId}/restock`, {
         method: "POST",
         body: JSON.stringify({ quantity }),
       });
-      toast({ title: "Stock updated" });
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      
+      // Update the product in the cache with all fields from the response
+      queryClient.setQueryData(['admin-products'], (oldData: any[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map(product => 
+          product.id === productId 
+            ? { 
+                ...product,
+                ...response, // Spread all fields from the response
+                // Ensure we have all required fields with defaults
+                stockQuantity: response.stockQuantity || 0,
+                inStock: response.inStock || false,
+                deliveryPrice: response.deliveryPrice || 0,
+                discount: response.discount || 0,
+                price: response.price || 0,
+                name: response.name || product.name,
+                description: response.description || product.description,
+                image: response.image || product.image,
+                category: response.category || product.category,
+                size: response.size || product.size
+              }
+            : product
+        );
+      });
+      
+      // If we're currently editing this product, update the form
+      if (editingProductId === productId) {
+        setProductForm(productToFormState(response));
+      }
+      
+      toast({ 
+        title: "Stock updated",
+        description: `Successfully added ${quantity} items to stock. New stock level: ${response.stockQuantity}`,
+        variant: "success"
+      });
     } catch (err: any) {
+      console.error("Restock error:", err);
       toast({
         title: "Restock failed",
         description: err.message || "Unable to restock product",
         variant: "destructive",
       });
+    } finally {
+      setRestockingProduct(null);
     }
   };
 
@@ -653,7 +715,7 @@ export default function Dashboard() {
                 <CardTitle>{editingProductId ? "Edit Product" : "Add New Product"}</CardTitle>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4" onSubmit={handleProductSubmit}>
+                <form ref={formRef} className="space-y-4" onSubmit={handleProductSubmit}>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="product-name">Name</Label>
@@ -726,6 +788,19 @@ export default function Dashboard() {
                       placeholder="https://..."
                       required
                     />
+                    {imagePreview && (
+                      <div className="mt-2">
+                        <div className="text-sm text-gray-500 mb-1">Preview:</div>
+                        <img 
+                          src={imagePreview} 
+                          alt="Preview" 
+                          className="h-32 w-32 object-cover rounded-md border"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="product-size">Size / Variant</Label>
@@ -808,9 +883,23 @@ export default function Dashboard() {
                                   <Edit className="h-3 w-3 mr-1" />
                                   Edit
                                 </Button>
-                                <Button size="xs" variant="secondary" onClick={() => handleRestockProduct(product.id)}>
-                                  <RefreshCw className="h-3 w-3 mr-1" />
-                                  Restock
+                                <Button 
+                                  size="xs" 
+                                  variant="secondary" 
+                                  onClick={() => handleRestockProduct(product.id)}
+                                  disabled={restockingProduct === product.id}
+                                >
+                                  {restockingProduct === product.id ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      Updating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RefreshCw className="h-3 w-3 mr-1" />
+                                      Restock
+                                    </>
+                                  )}
                                 </Button>
                                 <Button size="xs" variant="destructive" onClick={() => handleDeleteProduct(product.id)}>
                                   <Trash2 className="h-3 w-3 mr-1" />
