@@ -6,9 +6,9 @@ from typing import Any, Dict, List
 from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
 
-from .auth import require_firebase_auth
-from .db import Order, SessionLocal
-from .mpesa import initiate_stk_push
+from auth import require_firebase_auth
+from db import Order, SessionLocal
+from mpesa import initiate_stk_push
 
 bp_orders = Blueprint("orders", __name__, url_prefix="/api")
 

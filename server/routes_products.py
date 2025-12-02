@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db import Product, SessionLocal
+from db import Product, SessionLocal
 
 bp_products = Blueprint("products", __name__, url_prefix="/api")
 

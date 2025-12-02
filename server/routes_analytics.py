@@ -4,7 +4,7 @@ import json
 from flask import Blueprint, jsonify
 from sqlalchemy.orm import Session
 
-from .db import Order, SessionLocal
+from db import Order, SessionLocal
 
 bp_analytics = Blueprint("analytics", __name__, url_prefix="/api")
 
