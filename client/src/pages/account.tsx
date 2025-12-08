@@ -44,10 +44,10 @@ export default function Account() {
 
   // Fetch user orders
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["/api/orders/user"],
+    queryKey: ["/api/orders"],
     enabled: !!me,
     queryFn: async () => {
-      const res = await fetch("/api/orders/user", { credentials: "include" });
+      const res = await fetch("/api/orders", { credentials: "include" });
       if (!res.ok) {
         if (res.status === 401 || res.status === 404) {
           return [];

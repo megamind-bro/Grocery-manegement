@@ -21,7 +21,9 @@ const checkoutSchema = z.object({
   phone: z.string().min(10, "Please enter a valid phone number"),
   email: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
   address: z.string().min(10, "Please enter your full delivery address"),
-  paymentMethod: z.enum(["mpesa", "card", "cod"]),
+  paymentMethod: z.enum(["mpesa", "cod"]),
+  useLoyaltyPoints: z.boolean().optional(),
+  loyaltyPointsAmount: z.number().optional(),
 });
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
@@ -42,6 +44,8 @@ export default function Checkout() {
       email: "",
       address: "",
       paymentMethod: "mpesa",
+      useLoyaltyPoints: false,
+      loyaltyPointsAmount: 0,
     },
   });
 
@@ -62,6 +66,8 @@ export default function Checkout() {
             email: data.email || "",
             address: "",
             paymentMethod: "mpesa",
+            useLoyaltyPoints: false,
+            loyaltyPointsAmount: 0,
           });
         }
       } catch {}
@@ -137,6 +143,8 @@ export default function Checkout() {
         discount: state.discount.toString(),
         total: state.total.toString(),
         paymentMethod: data.paymentMethod,
+        useLoyaltyPoints: data.useLoyaltyPoints || false,
+        loyaltyPointsAmount: data.loyaltyPointsAmount || 0,
       };
 
       await createOrderMutation.mutateAsync(orderData);
@@ -313,15 +321,15 @@ export default function Checkout() {
                               </label>
                             </div>
 
-                            <div className="flex items-center space-x-3 p-3 border border-border rounded-lg">
-                              <RadioGroupItem value="card" id="card" />
-                              <label htmlFor="card" className="flex items-center space-x-3 cursor-pointer flex-1">
+                            <div className="flex items-center space-x-3 p-3 border border-border rounded-lg opacity-50 cursor-not-allowed">
+                              <RadioGroupItem value="card" id="card" disabled />
+                              <label htmlFor="card" className="flex items-center space-x-3 flex-1">
                                 <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
                                   <CreditCard className="h-5 w-5 text-blue-600" />
                                 </div>
                                 <div>
                                   <div className="font-medium">Credit/Debit Card</div>
-                                  <div className="text-sm text-gray-600">Visa, Mastercard accepted</div>
+                                  <div className="text-sm text-gray-600">Coming soon</div>
                                 </div>
                               </label>
                             </div>
@@ -346,6 +354,61 @@ export default function Checkout() {
                   />
                 </CardContent>
               </Card>
+
+              {/* Loyalty Points */}
+              {me?.loyaltyPoints > 0 && (
+                <Card>
+                  <CardContent className="p-6">
+                    <h3 className="text-xl font-semibold mb-4">Loyalty Points</h3>
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="text-sm text-gray-600">Available Points</div>
+                        <div className="text-2xl font-bold text-blue-600">{me.loyaltyPoints}</div>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="useLoyaltyPoints"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center space-x-2">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="w-4 h-4 rounded"
+                              />
+                            </FormControl>
+                            <label className="text-sm font-medium cursor-pointer">
+                              Use loyalty points for this order
+                            </label>
+                          </FormItem>
+                        )}
+                      />
+                      {form.watch("useLoyaltyPoints") && (
+                        <FormField
+                          control={form.control}
+                          name="loyaltyPointsAmount"
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="text-sm font-medium">Points to use (1 point = KSh 1)</label>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={Math.min(me.loyaltyPoints, Math.floor(state.total))}
+                                  {...field}
+                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Order Summary */}
@@ -391,14 +454,22 @@ export default function Checkout() {
                     </div>
                     {state.discount > 0 && (
                       <div className="flex justify-between text-green-600">
-                        <span>Discount</span>
+                        <span>Product Discount</span>
                         <span data-testid="text-order-discount">-KSh {state.discount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {form.watch("useLoyaltyPoints") && form.watch("loyaltyPointsAmount") > 0 && (
+                      <div className="flex justify-between text-blue-600">
+                        <span>Loyalty Points</span>
+                        <span>-KSh {form.watch("loyaltyPointsAmount")}</span>
                       </div>
                     )}
                     <hr className="border-border" />
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
-                      <span data-testid="text-order-total">KSh {state.total.toFixed(2)}</span>
+                      <span data-testid="text-order-total">
+                        KSh {(state.total - (form.watch("loyaltyPointsAmount") || 0)).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -419,7 +490,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock className="mr-2 h-4 w-4" />
-                    Place Order - KSh {state.total.toFixed(2)}
+                    Place Order - KSh {(state.total - (form.watch("loyaltyPointsAmount") || 0)).toFixed(2)}
                   </>
                 )}
               </Button>
