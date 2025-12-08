@@ -83,6 +83,9 @@ export default function Dashboard() {
   const [productSubmitting, setProductSubmitting] = useState(false);
   const [notificationSubmitting, setNotificationSubmitting] = useState(false);
   const [loyaltyUpdating, setLoyaltyUpdating] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [userOrders, setUserOrders] = useState<any[]>([]);
+  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -385,6 +388,47 @@ export default function Dashboard() {
       });
     } finally {
       setLoyaltyUpdating(null);
+    }
+  };
+
+  const handleViewUserOrders = async (userId: number) => {
+    if (selectedUserId === userId) {
+      setSelectedUserId(null);
+      setUserOrders([]);
+      return;
+    }
+    
+    try {
+      const orders = await fetchJson(`/api/admin/users/${userId}/orders`);
+      setSelectedUserId(userId);
+      setUserOrders(orders);
+    } catch (err: any) {
+      toast({
+        title: "Failed to load orders",
+        description: err.message || "Unable to fetch user orders",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: number, field: "orderStatus" | "paymentStatus", value: string) => {
+    setUpdatingOrderId(orderId);
+    try {
+      const payload = { [field]: value };
+      await fetchJson(`/api/admin/orders/${orderId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      toast({ title: "Order updated" });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    } catch (err: any) {
+      toast({
+        title: "Update failed",
+        description: err.message || "Unable to update order",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -951,12 +995,27 @@ export default function Dashboard() {
                           <span className="text-sm font-medium">
                             Total: KSh {Number(order.total).toFixed(2)}
                           </span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.paymentStatus)}`}>
-                            {order.paymentStatus}
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.orderStatus)}`}>
-                            {order.orderStatus}
-                          </span>
+                          <select
+                            className="text-xs px-2 py-1 rounded-full border border-border bg-white"
+                            value={order.paymentStatus}
+                            onChange={(e) => handleUpdateOrderStatus(order.id, "paymentStatus", e.target.value)}
+                            disabled={updatingOrderId === order.id}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="paid">Paid</option>
+                            <option value="failed">Failed</option>
+                          </select>
+                          <select
+                            className="text-xs px-2 py-1 rounded-full border border-border bg-white"
+                            value={order.orderStatus}
+                            onChange={(e) => handleUpdateOrderStatus(order.id, "orderStatus", e.target.value)}
+                            disabled={updatingOrderId === order.id}
+                          >
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
                           <Button size="sm" variant="outline" onClick={() => toggleOrderExpansion(order.id)}>
                             {expandedOrders[order.id] ? "Hide Items" : "View Items"}
                           </Button>
@@ -1042,6 +1101,13 @@ export default function Dashboard() {
                               >
                                 Set Points
                               </Button>
+                              <Button
+                                size="xs"
+                                variant={selectedUserId === user.id ? "secondary" : "outline"}
+                                onClick={() => handleViewUserOrders(user.id)}
+                              >
+                                {selectedUserId === user.id ? "Hide Orders" : "View Orders"}
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -1059,6 +1125,57 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+
+          {selectedUserId && userOrders.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Orders for Selected User</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {userOrders.map((order: any) => (
+                    <div key={order.id} className="border border-border rounded-lg p-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">Order #{order.id}</div>
+                          <div className="text-sm text-gray-500">
+                            {order.customerName} • {new Date(order.createdAt).toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {order.deliveryAddress}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span className="text-sm font-medium">
+                            Total: KSh {Number(order.total).toFixed(2)}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.paymentStatus)}`}>
+                            {order.paymentStatus}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.orderStatus)}`}>
+                            {order.orderStatus}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-3 bg-muted/30 rounded-lg p-3 space-y-2">
+                        {order.items?.map((item: any) => (
+                          <div key={`${order.id}-${item.id}`} className="flex items-center justify-between text-sm">
+                            <span>{item.name}</span>
+                            <span>
+                              Qty: {item.quantity} • KSh {Number(item.price).toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                        {(!order.items || order.items.length === 0) && (
+                          <div className="text-sm text-gray-500">No items recorded</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </section>
 
         <section id="notifications">
