@@ -347,6 +347,48 @@ def admin_list_users():
         } for u in users])
 
 
+@bp_admin.get("/users/<int:user_id>/orders")
+def admin_get_user_orders(user_id: int):
+    user = _require_admin()
+    if not user:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    with SessionLocal() as db:
+        target_user = db.query(User).get(user_id)
+        if not target_user:
+            return jsonify({"message": "User not found"}), 404
+        
+        orders = db.query(Order).filter(Order.user_id == user_id).all()
+        orders_data = []
+        for o in orders:
+            items = []
+            try:
+                items = json.loads(o.items) if isinstance(o.items, str) else o.items
+            except:
+                pass
+            
+            orders_data.append({
+                "id": o.id,
+                "userId": o.user_id,
+                "customerName": o.customer_name,
+                "customerPhone": o.customer_phone,
+                "customerEmail": o.customer_email,
+                "deliveryAddress": o.delivery_address,
+                "items": items,
+                "subtotal": f"{o.subtotal:.2f}",
+                "deliveryFee": f"{o.delivery_fee:.2f}",
+                "discount": f"{o.discount:.2f}",
+                "total": f"{o.total:.2f}",
+                "paymentMethod": o.payment_method,
+                "paymentStatus": o.payment_status,
+                "orderStatus": o.order_status,
+                "mpesaTransactionId": o.mpesa_transaction_id,
+                "createdAt": o.created_at.isoformat(),
+            })
+        
+        return jsonify(orders_data)
+
+
 @bp_admin.put("/users/<int:user_id>/loyalty")
 def admin_update_loyalty(user_id: int):
     user = _require_admin()
@@ -371,6 +413,33 @@ def admin_update_loyalty(user_id: int):
             "id": target_user.id,
             "loyaltyPoints": target_user.loyalty_points,
             "loyaltyEligible": target_user.loyalty_eligible,
+        })
+
+
+@bp_admin.put("/orders/<int:order_id>")
+def admin_update_order(order_id: int):
+    user = _require_admin()
+    if not user:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    data = request.get_json(force=True) or {}
+    with SessionLocal() as db:
+        order = db.query(Order).get(order_id)
+        if not order:
+            return jsonify({"message": "Order not found"}), 404
+        
+        if "orderStatus" in data:
+            order.order_status = data["orderStatus"]
+        if "paymentStatus" in data:
+            order.payment_status = data["paymentStatus"]
+        
+        db.commit()
+        db.refresh(order)
+        
+        return jsonify({
+            "id": order.id,
+            "orderStatus": order.order_status,
+            "paymentStatus": order.payment_status,
         })
 
 

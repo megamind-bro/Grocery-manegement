@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from sqlalchemy.orm import Session
 
 from auth import require_firebase_auth
-from db import Order, SessionLocal
+from db import Order, Product, DeliveryAddress, PaymentMethod, SessionLocal
 from mpesa import initiate_stk_push
 
 bp_orders = Blueprint("orders", __name__, url_prefix="/api")
@@ -16,8 +16,11 @@ bp_orders = Blueprint("orders", __name__, url_prefix="/api")
 @bp_orders.post("/orders")
 def create_order():
     data = request.get_json(force=True) or {}
+    user_id = session.get("user_id")
+    
     try:
         o = Order(
+            user_id=user_id,
             customer_name=data["customerName"],
             customer_phone=data["customerPhone"],
             customer_email=data.get("customerEmail"),
@@ -37,10 +40,73 @@ def create_order():
     except ValueError:
         return jsonify({"message": "Invalid numeric value in order"}), 400
 
-    with SessionLocal() as session:  # type: Session
-        session.add(o)
-        session.commit()
-        session.refresh(o)
+    with SessionLocal() as db:  # type: Session
+        # Update product stock for each item in the order
+        try:
+            items = data.get("items", [])
+            if isinstance(items, str):
+                items = json.loads(items)
+            
+            for item in items:
+                product = db.query(Product).get(item.get("id"))
+                if product:
+                    quantity = int(item.get("quantity", 0))
+                    if product.stock_quantity >= quantity:
+                        product.stock_quantity -= quantity
+                        product.in_stock = product.stock_quantity > 0
+                    else:
+                        return jsonify({"message": f"Insufficient stock for {product.name}"}), 400
+        except Exception as e:
+            return jsonify({"message": f"Error updating stock: {str(e)}"}), 400
+        
+        db.add(o)
+        db.commit()
+        db.refresh(o)
+        
+        # Save delivery address if user is logged in
+        if user_id:
+            try:
+                # Check if address already exists
+                existing_addr = db.query(DeliveryAddress).filter(
+                    DeliveryAddress.user_id == user_id,
+                    DeliveryAddress.address == data.get("deliveryAddress")
+                ).first()
+                
+                if not existing_addr:
+                    addr = DeliveryAddress(
+                        user_id=user_id,
+                        address=data.get("deliveryAddress", ""),
+                        phone=data.get("customerPhone", ""),
+                        is_default=False
+                    )
+                    db.add(addr)
+                    db.commit()
+            except Exception as e:
+                print(f"Error saving address: {str(e)}")
+        
+        # Save payment method if user is logged in
+        if user_id:
+            try:
+                payment_method = data.get("paymentMethod", "")
+                existing_pm = db.query(PaymentMethod).filter(
+                    PaymentMethod.user_id == user_id,
+                    PaymentMethod.method == payment_method
+                ).first()
+                
+                if not existing_pm:
+                    pm = PaymentMethod(
+                        user_id=user_id,
+                        method=payment_method,
+                        details=json.dumps({"phone": data.get("customerPhone", "")}) if payment_method == "mpesa" else None,
+                        is_default=False
+                    )
+                    db.add(pm)
+                    db.commit()
+            except Exception as e:
+                print(f"Error saving payment method: {str(e)}")
+        
+        # Serialize order while still in session context
+        order_data = _serialize_order(o)
 
     if data.get("paymentMethod") == "mpesa":
         try:
@@ -50,14 +116,17 @@ def create_order():
         except Exception:
             pass
 
-    return jsonify(_serialize_order(o))
+    return jsonify(order_data)
 
 
 @bp_orders.get("/orders")
-@require_firebase_auth
 def list_orders():
-    with SessionLocal() as session:  # type: Session
-        orders = session.query(Order).all()
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    with SessionLocal() as db:  # type: Session
+        orders = db.query(Order).filter(Order.user_id == user_id).all()
         return jsonify([_serialize_order(o) for o in orders])
 
 
@@ -87,6 +156,7 @@ def mpesa_callback():
 def _serialize_order(o: Order) -> Dict[str, Any]:
     return {
         "id": o.id,
+        "userId": o.user_id,
         "customerName": o.customer_name,
         "customerPhone": o.customer_phone,
         "customerEmail": o.customer_email,
