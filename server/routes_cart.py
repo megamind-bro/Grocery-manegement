@@ -31,7 +31,7 @@ def get_cart():
         cart = _get_user_cart(db, user_id)
         items = json.loads(cart.items) if cart.items else []
         
-        # Validate items against current product stock
+        # Validate items against current product stock and sync with latest product data
         valid_items = []
         for item in items:
             product = db.query(Product).get(item.get("id"))
@@ -40,10 +40,15 @@ def get_cart():
                 quantity = min(item.get("quantity", 1), product.stock_quantity)
                 if quantity > 0:
                     valid_items.append({
-                        **item,
+                        "id": product.id,
+                        "name": product.name,
+                        "price": float(product.price) if product.price is not None else 0,
+                        "image": product.image,
                         "quantity": quantity,
                         "availableStock": product.stock_quantity,
                         "inStock": product.in_stock,
+                        "deliveryPrice": float(product.delivery_price) if product.delivery_price is not None else 0,
+                        "discount": float(product.discount) if product.discount is not None else 0,
                     })
         
         # Update cart if items were modified
@@ -55,7 +60,8 @@ def get_cart():
         item_count = sum(item.get("quantity", 0) for item in valid_items)
         subtotal = sum(item.get("price", 0) * item.get("quantity", 0) for item in valid_items)
         delivery_fee = 50.0 if subtotal > 0 else 0.0
-        discount = 20.0 if subtotal > 500 else 0.0
+        # Per-product discount calculation
+        discount = sum(item.get("discount", 0) * item.get("quantity", 0) for item in valid_items)
         total = subtotal + delivery_fee - discount
         
         return jsonify({
@@ -107,11 +113,13 @@ def add_to_cart():
             items.append({
                 "id": product.id,
                 "name": product.name,
-                "price": product.price,
+                "price": float(product.price) if product.price is not None else 0,
                 "image": product.image,
                 "quantity": quantity,
                 "availableStock": product.stock_quantity,
                 "inStock": product.in_stock,
+                "deliveryPrice": float(product.delivery_price) if product.delivery_price is not None else 0,
+                "discount": float(product.discount) if product.discount is not None else 0,
             })
         
         cart.items = json.dumps(items)
@@ -149,11 +157,13 @@ def update_cart():
             valid_items.append({
                 "id": product.id,
                 "name": product.name,
-                "price": product.price,
+                "price": float(product.price) if product.price is not None else 0,
                 "image": product.image,
                 "quantity": quantity,
                 "availableStock": product.stock_quantity,
                 "inStock": product.in_stock,
+                "deliveryPrice": float(product.delivery_price) if product.delivery_price is not None else 0,
+                "discount": float(product.discount) if product.discount is not None else 0,
             })
         
         cart.items = json.dumps(valid_items)
