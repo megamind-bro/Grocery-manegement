@@ -10,3 +10,4 @@ MIGRATION_LOG.md
 server/venv
 .vscode
 __pycache__/
+.windsurf
