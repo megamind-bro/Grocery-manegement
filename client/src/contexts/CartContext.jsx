@@ -51,9 +51,22 @@ function cartReducer(state, action) {
 
 function calculateTotals(state) {
   const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  // Calculate subtotal and per-item discounts
+  let subtotal = 0;
+  let discount = 0;
+  
+  for (const item of state.items) {
+    const itemSubtotal = item.price * item.quantity;
+    subtotal += itemSubtotal;
+    
+    // Apply per-product discount if available
+    if (item.discount && item.discount > 0) {
+      discount += item.discount * item.quantity;
+    }
+  }
+  
   const deliveryFee = subtotal > 0 ? 50 : 0; // KSh 50 delivery fee
-  const discount = subtotal > 500 ? 20 : 0; // KSh 20 discount for orders over KSh 500
   const total = subtotal + deliveryFee - discount;
   
   return {
@@ -117,6 +130,7 @@ export function CartProvider({ children }) {
         if (res.ok) {
           const data = await res.json();
           if (data && data.id) {
+            // User is logged in - always use API cart
             await fetchCartFromApi();
             return;
           }
@@ -124,11 +138,31 @@ export function CartProvider({ children }) {
       } catch (error) {
         console.error("Failed to determine auth state:", error);
       }
+      // User is not logged in - use local storage
       setMode("local");
       loadCartFromLocal();
       setLoading(false);
     })();
   }, []);
+
+  // Periodically sync cart from API if in API mode
+  useEffect(() => {
+    if (mode !== "api" || loading) return;
+    
+    const syncInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/cart", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          syncApiCart(data.items || []);
+        }
+      } catch (error) {
+        console.error("Failed to sync cart:", error);
+      }
+    }, 30000); // Sync every 30 seconds
+    
+    return () => clearInterval(syncInterval);
+  }, [mode, loading]);
 
   useEffect(() => {
     if (loading) return;

@@ -104,9 +104,16 @@ export default function Cart() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg">{item.name}</h3>
                       <p className="text-gray-600 text-sm">{item.size}</p>
-                      <p className="font-semibold text-green-600">
-                        KSh {item.price.toFixed(2)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-green-600">
+                          KSh {item.price.toFixed(2)}
+                        </p>
+                        {item.discount > 0 && (
+                          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                            -KSh {item.discount.toFixed(2)} off
+                          </span>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="flex items-center space-x-2">
@@ -196,7 +203,7 @@ export default function Cart() {
                 </div>
                 <div className="flex items-center space-x-2 mt-1">
                   <i className="fas fa-truck text-green-600"></i>
-                  <span>Free delivery on orders over KSh 500</span>
+                  <span>Delivery fee: KSh 50</span>
                 </div>
               </div>
             </CardContent>
