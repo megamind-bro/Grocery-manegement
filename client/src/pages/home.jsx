@@ -1,17 +1,32 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import ProductCard from "@/components/ProductCard";
 import CategoryFilter from "@/components/CategoryFilter";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import GridContainer from "@/components/GridContainer";
+import GridToggle from "@/components/GridToggle";
+import { useGridLayout } from "@/hooks/useGridLayout";
 
 export default function Home() {
   const [location] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Grid layout management
+  const gridLayout = useGridLayout({
+    showGrid: false,
+    gridSize: 8,
+  });
 
   // Extract search query from URL
   useEffect(() => {
@@ -148,7 +163,22 @@ export default function Home() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <GridContainer
+        showGrid={gridLayout.showGrid}
+        gridSize={gridLayout.gridSize}
+        refreshKey={gridLayout.refreshKey}
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+      >
+        {/* Grid Toggle */}
+        <div className="mb-6">
+          <GridToggle
+            showGrid={gridLayout.showGrid}
+            gridSize={gridLayout.gridSize}
+            onToggleGrid={gridLayout.toggleGrid}
+            onChangeGridSize={gridLayout.changeGridSize}
+          />
+        </div>
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="flex-1">
@@ -199,7 +229,7 @@ export default function Home() {
             ))}
           </div>
         )}
-      </div>
+      </GridContainer>
     </div>
   );
 }

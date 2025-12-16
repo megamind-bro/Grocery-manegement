@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from typing import Any, Dict, List
 
 from flask import Blueprint, jsonify, request, session
 from sqlalchemy.orm import Session
 
 from auth import require_firebase_auth
-from db import Order, Product, DeliveryAddress, PaymentMethod, SessionLocal
+from db import Order, Product, DeliveryAddress, PaymentMethod, User, SessionLocal
 from mpesa import initiate_stk_push
+
+logger = logging.getLogger(__name__)
 
 bp_orders = Blueprint("orders", __name__, url_prefix="/api")
 
@@ -105,16 +109,57 @@ def create_order():
             except Exception as e:
                 print(f"Error saving payment method: {str(e)}")
         
+        # Handle loyalty points deduction and award new points
+        if user_id:
+            try:
+                user = db.query(User).get(user_id)
+                if user:
+                    # Deduct loyalty points if used
+                    loyalty_points_used = int(data.get("loyaltyPointsAmount", 0))
+                    if loyalty_points_used > 0:
+                        user.loyalty_points = max(0, user.loyalty_points - loyalty_points_used)
+                        logger.info(f"Deducted {loyalty_points_used} points from user {user_id}")
+                    
+                    # Award new loyalty points: 1000 KSh = 100 points
+                    order_total = float(data.get("total", 0))
+                    new_points = int(order_total / 1000 * 100)  # 100 points per 1000 KSh
+                    
+                    if new_points > 0:
+                        user.loyalty_points += new_points
+                        user.total_spent += order_total
+                        logger.info(f"Awarded {new_points} points to user {user_id}. Total spent: {user.total_spent}")
+                    
+                    db.commit()
+            except Exception as e:
+                logger.error(f"Error updating loyalty points for user {user_id}: {str(e)}")
+        
         # Serialize order while still in session context
         order_data = _serialize_order(o)
 
     if data.get("paymentMethod") == "mpesa":
         try:
-            # fire-and-forget; in real code, persist checkoutRequestID mapping
-            import anyio
-            anyio.run(initiate_stk_push, str(o.id), data["customerPhone"], float(data["total"]))
-        except Exception:
-            pass
+            # Format phone number to M-Pesa format (254XXXXXXXXX)
+            phone = data["customerPhone"].strip()
+            # Remove leading 0 if present and add country code
+            if phone.startswith("0"):
+                phone = "254" + phone[1:]
+            elif not phone.startswith("254"):
+                phone = "254" + phone
+            
+            # Trigger STK push asynchronously
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    initiate_stk_push(str(o.id), phone, float(data["total"]))
+                )
+                logger.info(f"STK push initiated for order {o.id}: {result}")
+            except Exception as stk_error:
+                logger.error(f"STK push failed for order {o.id}: {str(stk_error)}")
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error processing M-Pesa payment for order {o.id}: {str(e)}")
 
     return jsonify(order_data)
 
