@@ -101,9 +101,16 @@ export default function ProductCard({ product }) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-bold text-green-600 text-lg">
-                  KSh {product.price}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-green-600 text-lg">
+                    KSh {product.price}
+                  </p>
+                  {product.discount > 0 && (
+                    <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-semibold">
+                      -KSh {product.discount}
+                    </span>
+                  )}
+                </div>
                 {product.size && (
                   <p className="text-sm text-gray-500">{product.size}</p>
                 )}

@@ -31,9 +31,10 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 export default function Checkout() {
   const { state, clearCart } = useCart();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
   const [me, setMe] = useState<any>(null);
+  const [pointsFromCart, setPointsFromCart] = useState(0);
 
   const form = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
@@ -50,11 +51,24 @@ export default function Checkout() {
   });
 
   useEffect(() => {
+    // Extract points from URL query parameter
+    const params = new URLSearchParams(location.split('?')[1]);
+    const pointsParam = parseInt(params.get('points') || '0', 10);
+    setPointsFromCart(pointsParam);
+  }, [location]);
+
+  useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/auth/me", { credentials: "include" });
         const data = await res.json();
         setMe(data);
+        
+        // Redirect admins to dashboard
+        if (data?.isAdmin) {
+          navigate("/dashboard");
+          return;
+        }
         
         // Pre-fill form with user data if available
         if (data) {
@@ -66,14 +80,14 @@ export default function Checkout() {
             email: data.email || "",
             address: "",
             paymentMethod: "mpesa",
-            useLoyaltyPoints: false,
-            loyaltyPointsAmount: 0,
+            useLoyaltyPoints: pointsFromCart > 0,
+            loyaltyPointsAmount: pointsFromCart,
           });
         }
       } catch {}
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigate, pointsFromCart]);
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -136,12 +150,14 @@ export default function Checkout() {
           price: item.price,
           quantity: item.quantity,
           image: item.image,
+          discount: item.discount || 0,
+          deliveryPrice: item.deliveryPrice || 0,
           total: item.price * item.quantity
         })),
         subtotal: state.subtotal.toString(),
         deliveryFee: state.deliveryFee.toString(),
         discount: state.discount.toString(),
-        total: state.total.toString(),
+        total: (state.total - (data.loyaltyPointsAmount || 0)).toString(),
         paymentMethod: data.paymentMethod,
         useLoyaltyPoints: data.useLoyaltyPoints || false,
         loyaltyPointsAmount: data.loyaltyPointsAmount || 0,
@@ -390,12 +406,12 @@ export default function Checkout() {
                           name="loyaltyPointsAmount"
                           render={({ field }) => (
                             <FormItem>
-                              <label className="text-sm font-medium">Points to use (1 point = KSh 1)</label>
+                              <label className="text-sm font-medium">Points to use (100 points = KSh 10)</label>
                               <FormControl>
                                 <Input
                                   type="number"
                                   min="0"
-                                  max={Math.min(me.loyaltyPoints, Math.floor(state.total))}
+                                  max={Math.min(me.loyaltyPoints, Math.floor(state.total * 10))}
                                   {...field}
                                   onChange={(e) => field.onChange(Number(e.target.value))}
                                 />
@@ -461,14 +477,14 @@ export default function Checkout() {
                     {form.watch("useLoyaltyPoints") && form.watch("loyaltyPointsAmount") > 0 && (
                       <div className="flex justify-between text-blue-600">
                         <span>Loyalty Points</span>
-                        <span>-KSh {form.watch("loyaltyPointsAmount")}</span>
+                        <span>-KSh {((form.watch("loyaltyPointsAmount") || 0) * 0.1).toFixed(2)}</span>
                       </div>
                     )}
                     <hr className="border-border" />
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
                       <span data-testid="text-order-total">
-                        KSh {(state.total - (form.watch("loyaltyPointsAmount") || 0)).toFixed(2)}
+                        KSh {(state.total - ((form.watch("loyaltyPointsAmount") || 0) * 0.1)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -490,7 +506,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock className="mr-2 h-4 w-4" />
-                    Place Order - KSh {(state.total - (form.watch("loyaltyPointsAmount") || 0)).toFixed(2)}
+                    Place Order - KSh {(state.total - ((form.watch("loyaltyPointsAmount") || 0) * 0.1)).toFixed(2)}
                   </>
                 )}
               </Button>

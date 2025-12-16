@@ -985,10 +985,38 @@ export default function Dashboard() {
                   {orders.map((order: any) => (
                     <div key={order.id} className="border border-border rounded-lg p-4">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div>
+                        <div className="flex-1">
                           <div className="font-semibold">Order #{order.id}</div>
-                          <div className="text-sm text-gray-500">
-                            {order.customerName} • {new Date(order.createdAt).toLocaleString()}
+                          <div className="text-sm text-gray-500 space-y-1">
+                            <div>
+                              <span className="font-medium">Customer:</span> {order.customerName}
+                              {order.user && (
+                                <span className="text-xs text-gray-400 ml-2">
+                                  (User: {order.user.username})
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-medium">Phone:</span> {order.customerPhone}
+                            </div>
+                            <div>
+                              <span className="font-medium">Email:</span> {order.customerEmail || "N/A"}
+                            </div>
+                            <div>
+                              <span className="font-medium">Address:</span> {order.deliveryAddress}
+                            </div>
+                            <div>
+                              <span className="font-medium">Payment Method:</span> {order.paymentMethod}
+                            </div>
+                            <div>
+                              <span className="font-medium">Date:</span> {new Date(order.createdAt).toLocaleString()}
+                            </div>
+                            {order.user && (
+                              <div className="text-xs text-blue-600 mt-2">
+                                <span className="font-medium">User ID:</span> {order.user.id} • 
+                                <span className="font-medium ml-2">Loyalty Points:</span> {order.user.loyaltyPoints || 0}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 items-center">
@@ -1022,18 +1050,52 @@ export default function Dashboard() {
                         </div>
                       </div>
                       {expandedOrders[order.id] && (
-                        <div className="mt-4 bg-muted/30 rounded-lg p-4 space-y-2">
-                          {order.items?.map((item: any) => (
-                            <div key={`${order.id}-${item.id}`} className="flex items-center justify-between text-sm">
-                              <span>{item.name}</span>
-                              <span>
-                                Qty: {item.quantity} • KSh {Number(item.price).toFixed(2)}
-                              </span>
+                        <div className="mt-4 bg-muted/30 rounded-lg p-4 space-y-3">
+                          <div className="border-b border-border pb-3">
+                            <h4 className="font-semibold text-sm mb-2">Order Items</h4>
+                            {order.items?.map((item: any) => (
+                              <div key={`${order.id}-${item.id}`} className="flex items-center justify-between text-sm py-1">
+                                <div className="flex-1">
+                                  <span className="font-medium">{item.name}</span>
+                                  {item.size && <span className="text-xs text-gray-500 ml-2">({item.size})</span>}
+                                </div>
+                                <div className="text-right">
+                                  <div>Qty: {item.quantity}</div>
+                                  <div>Price: KSh {Number(item.price).toFixed(2)}</div>
+                                  {item.discount > 0 && (
+                                    <div className="text-xs text-green-600">Discount: -KSh {Number(item.discount).toFixed(2)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            {(!order.items || order.items.length === 0) && (
+                              <div className="text-sm text-gray-500">No items recorded</div>
+                            )}
+                          </div>
+                          
+                          <div className="border-t border-border pt-3">
+                            <h4 className="font-semibold text-sm mb-2">Order Summary</h4>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex justify-between">
+                                <span>Subtotal:</span>
+                                <span>KSh {Number(order.subtotal).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Delivery Fee:</span>
+                                <span>KSh {Number(order.deliveryFee).toFixed(2)}</span>
+                              </div>
+                              {Number(order.discount) > 0 && (
+                                <div className="flex justify-between text-green-600">
+                                  <span>Discount:</span>
+                                  <span>-KSh {Number(order.discount).toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between font-semibold border-t border-border pt-1 mt-1">
+                                <span>Total:</span>
+                                <span>KSh {Number(order.total).toFixed(2)}</span>
+                              </div>
                             </div>
-                          ))}
-                          {(!order.items || order.items.length === 0) && (
-                            <div className="text-sm text-gray-500">No items recorded</div>
-                          )}
+                          </div>
                         </div>
                       )}
                     </div>

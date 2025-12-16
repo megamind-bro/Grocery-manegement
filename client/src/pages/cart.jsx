@@ -3,13 +3,17 @@ import { Link, useLocation } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck, Gift } from "lucide-react";
 
 export default function Cart() {
   const { state, updateQuantity, removeFromCart } = useCart();
   const [, navigate] = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [userData, setUserData] = useState(null);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -18,6 +22,15 @@ export default function Cart() {
         if (res.ok) {
           const data = await res.json();
           setIsLoggedIn(!!data);
+          setIsAdmin(data?.isAdmin || false);
+          setUserData(data);
+          
+          // Redirect admins to dashboard
+          if (data?.isAdmin) {
+            navigate("/dashboard");
+            return;
+          }
+          
           if (!data) {
             navigate("/login");
           }
@@ -33,6 +46,33 @@ export default function Cart() {
       }
     })();
   }, [navigate]);
+
+  // Calculate points value in KSh (100 points = 10 KSh)
+  const pointsValueInKsh = (userData?.loyaltyPoints || 0) * 0.1;
+  
+  // Calculate maximum points that can be used (cannot exceed cart total)
+  const maxPointsToUse = Math.min(userData?.loyaltyPoints || 0, Math.floor(state.total * 10));
+  const maxPointsValueInKsh = maxPointsToUse * 0.1;
+
+  // Handle points usage toggle
+  const handleUsePoints = (checked) => {
+    setUsePoints(checked);
+    if (checked) {
+      setPointsToUse(maxPointsToUse);
+    } else {
+      setPointsToUse(0);
+    }
+  };
+
+  // Handle manual points adjustment
+  const handlePointsChange = (value) => {
+    const numValue = Math.min(parseInt(value) || 0, maxPointsToUse);
+    setPointsToUse(Math.max(0, numValue));
+  };
+
+  // Calculate final total after points deduction
+  const pointsDeduction = pointsToUse * 0.1;
+  const finalTotal = Math.max(0, state.total - pointsDeduction);
 
   if (isLoading) {
     return (
@@ -182,13 +222,79 @@ export default function Cart() {
                 <hr className="my-3" />
                 
                 <div className="flex justify-between font-semibold text-lg">
-                  <span>Total</span>
+                  <span>Subtotal</span>
                   <span>KSh {state.total.toFixed(2)}</span>
                 </div>
               </div>
+
+              {/* Loyalty Points Section */}
+              {userData && (userData.loyaltyPoints || 0) > 0 && (
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <Gift className="h-4 w-4 text-blue-600" />
+                      <span className="font-semibold text-blue-900">Loyalty Points</span>
+                    </div>
+                    <span className="text-sm font-medium text-blue-600">
+                      {userData.loyaltyPoints} points
+                    </span>
+                  </div>
+                  
+                  <div className="text-xs text-blue-700 mb-3">
+                    <div>Available: {userData.loyaltyPoints} points = KSh {pointsValueInKsh.toFixed(2)}</div>
+                    <div className="mt-1">Max usable: {maxPointsToUse} points = KSh {maxPointsValueInKsh.toFixed(2)}</div>
+                  </div>
+
+                  {maxPointsToUse > 0 && (
+                    <>
+                      <label className="flex items-center space-x-2 cursor-pointer mb-3">
+                        <input
+                          type="checkbox"
+                          checked={usePoints}
+                          onChange={(e) => handleUsePoints(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span className="text-sm font-medium text-blue-900">Use points for this order</span>
+                      </label>
+
+                      {usePoints && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-blue-900">
+                            Points to use:
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={maxPointsToUse}
+                            value={pointsToUse}
+                            onChange={(e) => handlePointsChange(e.target.value)}
+                            className="w-full px-2 py-2 border border-blue-300 rounded text-sm"
+                          />
+                          <div className="text-xs text-blue-700">
+                            Deduction: KSh {pointsDeduction.toFixed(2)}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Final Total */}
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>Final Total</span>
+                  <span className="text-green-600">KSh {finalTotal.toFixed(2)}</span>
+                </div>
+                {pointsDeduction > 0 && (
+                  <div className="text-xs text-green-600 mt-1">
+                    Saved: KSh {pointsDeduction.toFixed(2)} with points
+                  </div>
+                )}
+              </div>
               
               <div className="mt-6">
-                <Link href="/checkout">
+                <Link href={`/checkout?points=${pointsToUse}`}>
                   <Button className="w-full" size="lg">
                     <ShieldCheck className="h-4 w-4 mr-2" />
                     Proceed to Checkout
