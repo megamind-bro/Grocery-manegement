@@ -5,10 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev:client": "vite",
-    "dev:server": "cd server && ./venv/bin/python -m server.app",
+    "dev:server": "cd server && ./env/bin/python -m app",
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:both": "bash ./run-dev.sh",
     "build": "vite build",
-    "start": "cd server && ./venv/bin/python -m server.app"
+    "start": "cd server && ./env/bin/python -m app"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

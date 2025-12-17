@@ -160,11 +160,43 @@ npm run dev:server
 npm run dev:client
 ```
 
-### 5. Access the Application
+### 5. Create Admin Account
+
+To create an admin account, run the following script:
+
+```bash
+cd server
+source env/bin/activate
+python create_admin.py
+```
+
+Or use environment variables:
+
+```bash
+ADMIN_USERNAME=admin ADMIN_EMAIL=admin@example.com ADMIN_NAME="Admin User" ADMIN_PASSWORD=yourpassword python create_admin.py
+```
+
+The script will:
+- Create a new admin account if the username doesn't exist
+- Update an existing user to admin if the username already exists
+- Set the user's email, name, and password
+- Grant admin privileges
+
+### 6. Access the Application
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5000
 - **API Documentation**: http://localhost:5000/api
+
+## Important Notes
+
+### Authentication Requirements
+
+- **Adding to Cart**: Users must be logged in to add items to cart
+- **Viewing Cart**: Users must be logged in to view their cart
+- **Checkout**: Users must be logged in to proceed to checkout
+- **Admin Accounts**: Admin accounts cannot add items to cart or place orders (they can only access the dashboard)
+- **Customer Accounts**: Regular users can shop, add to cart, and place orders
 
 ## Production Deployment
 

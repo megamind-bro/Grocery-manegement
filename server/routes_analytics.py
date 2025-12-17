@@ -1,18 +1,37 @@
 from __future__ import annotations
 
 import json
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, session
 from sqlalchemy.orm import Session
 
-from .db import Order, SessionLocal
+from db import Order, SessionLocal, User
 
 bp_analytics = Blueprint("analytics", __name__, url_prefix="/api")
 
 
+def _require_admin():
+    """Check if current user is admin"""
+    from flask import session as flask_session
+    if not flask_session.get("is_admin"):
+        return None
+    uid = flask_session.get("user_id")
+    if not uid:
+        return None
+    with SessionLocal() as db:
+        user = db.query(User).get(uid)
+        if user and user.is_admin:
+            return user
+    return None
+
+
 @bp_analytics.get("/analytics")
 def analytics():
-    with SessionLocal() as session:  # type: Session
-        orders = session.query(Order).all()
+    # Only admins can access analytics
+    admin_user = _require_admin()
+    if not admin_user:
+        return jsonify({"message": "Unauthorized. Admin access required."}), 403
+    with SessionLocal() as db:  # type: Session
+        orders = db.query(Order).all()
         completed = [o for o in orders if o.payment_status == "completed"]
         total_revenue = sum(float(o.total) for o in completed)
         total_orders = len(orders)

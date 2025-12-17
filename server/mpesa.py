@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 import httpx
-from .config import config
+from config import config
 
 
 async def get_access_token() -> str:

@@ -5,7 +5,7 @@ from functools import wraps
 from typing import Callable, Optional
 
 from flask import Request, jsonify, request
-from .config import config
+from config import config
 
 try:
     import firebase_admin

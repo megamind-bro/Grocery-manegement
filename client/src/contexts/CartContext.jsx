@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect } from "react";
+import { createContext, useContext, useReducer, useEffect, useState } from "react";
 
 const CartContext = createContext(null);
 
@@ -77,9 +77,10 @@ const initialState = {
 
 export function CartProvider({ children }) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState("local"); // "local" | "api"
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
+  const loadCartFromLocal = () => {
     const savedCart = localStorage.getItem("freshmart-cart");
     if (savedCart) {
       try {
@@ -88,28 +89,127 @@ export function CartProvider({ children }) {
       } catch (error) {
         console.error("Failed to load cart from localStorage:", error);
       }
+    } else {
+      dispatch({ type: "LOAD_CART", payload: [] });
     }
+  };
+
+  const fetchCartFromApi = async () => {
+    try {
+      const res = await fetch("/api/cart", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch cart");
+      const data = await res.json();
+      dispatch({ type: "LOAD_CART", payload: data.items || [] });
+      setMode("api");
+    } catch (error) {
+      console.error("Failed to load cart from API:", error);
+      setMode("local");
+      loadCartFromLocal();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.id) {
+            await fetchCartFromApi();
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to determine auth state:", error);
+      }
+      setMode("local");
+      loadCartFromLocal();
+      setLoading(false);
+    })();
   }, []);
 
-  // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("freshmart-cart", JSON.stringify(state.items));
-  }, [state.items]);
+    if (loading) return;
+    if (mode === "local") {
+      localStorage.setItem("freshmart-cart", JSON.stringify(state.items));
+    }
+  }, [state.items, loading, mode]);
 
-  const addToCart = (product) => {
-    dispatch({ type: "ADD_ITEM", payload: product });
+  const syncApiCart = (items) => {
+    dispatch({ type: "LOAD_CART", payload: items || [] });
   };
 
-  const removeFromCart = (id) => {
-    dispatch({ type: "REMOVE_ITEM", payload: id });
+  const addToCart = async (product) => {
+    if (mode === "api") {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ productId: product.id, quantity: 1 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to add to cart");
+      }
+      syncApiCart(data.items || []);
+    } else {
+      dispatch({ type: "ADD_ITEM", payload: product });
+    }
   };
 
-  const updateQuantity = (id, quantity) => {
-    dispatch({ type: "UPDATE_QUANTITY", payload: { id, quantity } });
+  const removeFromCart = async (id) => {
+    if (mode === "api") {
+      const res = await fetch(`/api/cart/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to remove from cart");
+      }
+      syncApiCart(data.items || []);
+    } else {
+      dispatch({ type: "REMOVE_ITEM", payload: id });
+    }
   };
 
-  const clearCart = () => {
-    dispatch({ type: "CLEAR_CART" });
+  const updateQuantity = async (id, quantity) => {
+    if (mode === "api") {
+      const updatedItems = state.items.map(item =>
+        item.id === id ? { ...item, quantity } : item
+      ).filter(item => item.quantity > 0);
+      const res = await fetch("/api/cart", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ items: updatedItems }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update cart");
+      }
+      syncApiCart(data.items || []);
+    } else {
+      dispatch({ type: "UPDATE_QUANTITY", payload: { id, quantity } });
+    }
+  };
+
+  const clearCart = async () => {
+    if (mode === "api") {
+      const res = await fetch("/api/cart", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to clear cart");
+      }
+      syncApiCart([]);
+    } else {
+      dispatch({ type: "CLEAR_CART" });
+    }
   };
 
   return (
@@ -121,6 +221,8 @@ export function CartProvider({ children }) {
         removeFromCart,
         updateQuantity,
         clearCart,
+        loading,
+        mode,
       }}
     >
       {children}

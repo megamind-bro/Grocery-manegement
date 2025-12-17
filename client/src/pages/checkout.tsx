@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,7 +29,9 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 export default function Checkout() {
   const { state, clearCart } = useCart();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [me, setMe] = useState<any>(null);
 
   const form = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
@@ -42,6 +44,30 @@ export default function Checkout() {
       paymentMethod: "mpesa",
     },
   });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const data = await res.json();
+        setMe(data);
+        
+        // Pre-fill form with user data if available
+        if (data) {
+          const nameParts = (data.name || "").split(" ");
+          form.reset({
+            firstName: nameParts[0] || "",
+            lastName: nameParts.slice(1).join(" ") || "",
+            phone: "",
+            email: data.email || "",
+            address: "",
+            paymentMethod: "mpesa",
+          });
+        }
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -58,6 +84,10 @@ export default function Checkout() {
         }`,
       });
       clearCart();
+      // Redirect to account page to view order
+      setTimeout(() => {
+        navigate("/account");
+      }, 2000);
     },
     onError: (error) => {
       toast({
@@ -69,6 +99,14 @@ export default function Checkout() {
   });
 
   const onSubmit = async (data: CheckoutForm) => {
+    if (me?.isAdmin) {
+      toast({
+        title: "Admins cannot place orders",
+        description: "Please log out or use a customer account.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (state.items.length === 0) {
       toast({
         title: "Cart is empty",
@@ -82,17 +120,18 @@ export default function Checkout() {
 
     try {
       const orderData = {
-        customerName: `${data.firstName} ${data.lastName}`,
+        customerName: `${data.firstName} ${data.lastName}`.trim(),
         customerPhone: data.phone,
-        customerEmail: data.email || null,
+        customerEmail: data.email || me?.email || null,
         deliveryAddress: data.address,
-        items: JSON.stringify(state.items.map(item => ({
+        items: state.items.map(item => ({
           id: item.id,
           name: item.name,
           price: item.price,
           quantity: item.quantity,
+          image: item.image,
           total: item.price * item.quantity
-        }))),
+        })),
         subtotal: state.subtotal.toString(),
         deliveryFee: state.deliveryFee.toString(),
         discount: state.discount.toString(),
@@ -107,6 +146,28 @@ export default function Checkout() {
       setIsProcessing(false);
     }
   };
+
+  // Check if user is logged in
+  useEffect(() => {
+    if (me === null) {
+      // Still loading
+      return;
+    }
+    if (!me) {
+      // Not logged in, redirect to login
+      navigate("/login");
+    }
+  }, [me, navigate]);
+
+  if (!me) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-16">
+          <div className="text-gray-500">Redirecting to login...</div>
+        </div>
+      </div>
+    );
+  }
 
   if (state.items.length === 0) {
     return (

@@ -1,9 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+// @ts-nocheck
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, ShoppingBag, Calculator, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, TrendingUp, ShoppingBag, Calculator, Users, Trash2, Edit, RefreshCw, Send } from "lucide-react";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface AnalyticsData {
   totalRevenue: number;
@@ -27,10 +33,351 @@ interface AnalyticsData {
   }>;
 }
 
+type ProductFormState = {
+  name: string;
+  description: string;
+  price: string;
+  image: string;
+  category: string;
+  size: string;
+  stockQuantity: string;
+  deliveryPrice: string;
+  discount: string;
+};
+
+type NotificationFormState = {
+  title: string;
+  message: string;
+  type: string;
+  userId: string;
+};
+
 export default function Dashboard() {
-  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
-    queryKey: ["/api/analytics"],
+  const [, navigate] = useLocation();
+  const [me, setMe] = useState(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [expandedOrders, setExpandedOrders] = useState<Record<number, boolean>>({});
+  const initialProductForm: ProductFormState = {
+    name: "",
+    description: "",
+    price: "",
+    image: "",
+    category: "",
+    size: "",
+    stockQuantity: "0",
+    deliveryPrice: "",
+    discount: "",
+  };
+  const [productForm, setProductForm] = useState<ProductFormState>(initialProductForm);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [notificationForm, setNotificationForm] = useState<NotificationFormState>({
+    title: "",
+    message: "",
+    type: "info",
+    userId: "",
   });
+  const [productSubmitting, setProductSubmitting] = useState(false);
+  const [notificationSubmitting, setNotificationSubmitting] = useState(false);
+  const [loyaltyUpdating, setLoyaltyUpdating] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const data = await res.json();
+        setMe(data);
+        if (!data || !data.isAdmin) {
+          navigate("/");
+        }
+      } catch {
+        navigate("/");
+      }
+    })();
+  }, [navigate]);
+
+  const fetchJson = async (url: string, options: RequestInit = {}) => {
+    const headers: Record<string, string> = {};
+    if (options.body && !(options.body instanceof FormData)) {
+      headers["Content-Type"] = headers["Content-Type"] || "application/json";
+    }
+    const res = await fetch(url, {
+      credentials: "include",
+      ...options,
+      headers,
+    });
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+    if (!res.ok) {
+      throw new Error(data?.message || "Request failed");
+    }
+    return data;
+  };
+
+  const productsQuery = useQuery<any[]>({
+    queryKey: ["admin-products"],
+    enabled: !!me?.isAdmin,
+    queryFn: () => fetchJson("/api/products"),
+  });
+
+  const ordersQuery = useQuery<any[]>({
+    queryKey: ["admin-orders"],
+    enabled: !!me?.isAdmin,
+    queryFn: () => fetchJson("/api/admin/orders"),
+  });
+
+  const usersQuery = useQuery<any[]>({
+    queryKey: ["admin-users"],
+    enabled: !!me?.isAdmin,
+    queryFn: () => fetchJson("/api/admin/users"),
+  });
+
+  const { data: analytics, isLoading, error } = useQuery<AnalyticsData>({
+    queryKey: ["/api/analytics"],
+    enabled: !!me?.isAdmin,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch("/api/analytics", { credentials: "include" });
+      if (!res.ok) {
+        throw new Error("Failed to fetch analytics");
+      }
+      return res.json();
+    },
+  });
+
+  const products = productsQuery.data || [];
+  const orders = ordersQuery.data || [];
+  const users = usersQuery.data || [];
+
+  const isProductsLoading = productsQuery.isLoading || productsQuery.isFetching;
+  const isOrdersLoading = ordersQuery.isLoading || ordersQuery.isFetching;
+  const isUsersLoading = usersQuery.isLoading || usersQuery.isFetching;
+
+  const handleProductInputChange = (field: keyof ProductFormState, value: string) => {
+    setProductForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const resetProductForm = () => {
+    setProductForm(initialProductForm);
+    setEditingProductId(null);
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProductId(product.id);
+    setProductForm({
+      name: product.name ?? "",
+      description: product.description ?? "",
+      price: product.price != null ? String(product.price) : "",
+      image: product.image ?? "",
+      category: product.category ?? "",
+      size: product.size ?? "",
+      stockQuantity: product.stockQuantity != null ? String(product.stockQuantity) : "0",
+      deliveryPrice: product.deliveryPrice != null ? String(product.deliveryPrice) : "",
+      discount: product.discount != null ? String(product.discount) : "",
+    });
+  };
+
+  const handleProductSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setProductSubmitting(true);
+    try {
+      const payload = {
+        name: productForm.name.trim(),
+        description: productForm.description.trim(),
+        price: Number(productForm.price || 0),
+        image: productForm.image.trim(),
+        category: productForm.category.trim(),
+        size: productForm.size.trim(),
+        stockQuantity: Number(productForm.stockQuantity || 0),
+        deliveryPrice: productForm.deliveryPrice ? Number(productForm.deliveryPrice) : null,
+        discount: productForm.discount ? Number(productForm.discount) : null,
+      };
+
+      if (!payload.name || !payload.price || !payload.image || !payload.category) {
+        throw new Error("Name, price, image, and category are required");
+      }
+
+      if (editingProductId) {
+        await fetchJson(`/api/admin/products/${editingProductId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        toast({ title: "Product updated" });
+      } else {
+        await fetchJson("/api/admin/products", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        toast({ title: "Product created" });
+      }
+      resetProductForm();
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (err: any) {
+      toast({
+        title: "Product save failed",
+        description: err.message || "Unable to save product",
+        variant: "destructive",
+      });
+    } finally {
+      setProductSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    const confirmDelete = window.confirm("Delete this product? This cannot be undone.");
+    if (!confirmDelete) return;
+    try {
+      await fetchJson(`/api/admin/products/${productId}`, { method: "DELETE" });
+      toast({ title: "Product deleted" });
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (err: any) {
+      toast({
+        title: "Delete failed",
+        description: err.message || "Unable to delete product",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRestockProduct = async (productId: number) => {
+    const value = window.prompt("Enter quantity to add", "10");
+    if (!value) return;
+    const quantity = Number(value);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      toast({
+        title: "Invalid quantity",
+        description: "Please enter a positive number",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await fetchJson(`/api/admin/products/${productId}/restock`, {
+        method: "POST",
+        body: JSON.stringify({ quantity }),
+      });
+      toast({ title: "Stock updated" });
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (err: any) {
+      toast({
+        title: "Restock failed",
+        description: err.message || "Unable to restock product",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleOrderExpansion = (orderId: number) => {
+    setExpandedOrders((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
+  };
+
+  const handleToggleLoyalty = async (userId: number, current: boolean) => {
+    setLoyaltyUpdating(userId);
+    try {
+      await fetchJson(`/api/admin/users/${userId}/loyalty`, {
+        method: "PUT",
+        body: JSON.stringify({ loyaltyEligible: !current }),
+      });
+      toast({ title: "Loyalty updated" });
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    } catch (err: any) {
+      toast({
+        title: "Update failed",
+        description: err.message || "Unable to update loyalty",
+        variant: "destructive",
+      });
+    } finally {
+      setLoyaltyUpdating(null);
+    }
+  };
+
+  const handleSetPoints = async (userId: number, currentPoints: number) => {
+    const value = window.prompt("Enter loyalty points", String(currentPoints ?? 0));
+    if (value === null) return;
+    const points = Number(value);
+    if (!Number.isFinite(points) || points < 0) {
+      toast({
+        title: "Invalid points",
+        description: "Enter a non-negative number",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLoyaltyUpdating(userId);
+    try {
+      await fetchJson(`/api/admin/users/${userId}/loyalty`, {
+        method: "PUT",
+        body: JSON.stringify({ loyaltyPoints: points }),
+      });
+      toast({ title: "Points updated" });
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    } catch (err: any) {
+      toast({
+        title: "Update failed",
+        description: err.message || "Unable to update points",
+        variant: "destructive",
+      });
+    } finally {
+      setLoyaltyUpdating(null);
+    }
+  };
+
+  const handleSendNotification = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setNotificationSubmitting(true);
+    try {
+      const payload: any = {
+        title: notificationForm.title.trim(),
+        message: notificationForm.message.trim(),
+        type: notificationForm.type,
+      };
+      if (notificationForm.userId) {
+        payload.userId = Number(notificationForm.userId);
+      }
+      if (!payload.title || !payload.message) {
+        throw new Error("Title and message are required");
+      }
+      await fetchJson("/api/notifications/admin/send", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      toast({ title: "Notification sent" });
+      setNotificationForm({ title: "", message: "", type: "info", userId: "" });
+    } catch (err: any) {
+      toast({
+        title: "Failed to send notification",
+        description: err.message || "Unable to send notification",
+        variant: "destructive",
+      });
+    } finally {
+      setNotificationSubmitting(false);
+    }
+  };
+
+  if (!me) {
+    return (
+      <div className="flex justify-center items-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Checking access...</span>
+      </div>
+    );
+  }
+
+  if (!me.isAdmin) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-gray-500 text-lg mb-4">Access Denied</p>
+        <p className="text-gray-400 mb-4">Only administrators can access the dashboard.</p>
+        <Link href="/">
+          <Button>Go to Home</Button>
+        </Link>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -41,10 +388,14 @@ export default function Dashboard() {
     );
   }
 
-  if (!analytics) {
+  if (error || !analytics) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-500 text-lg">Failed to load analytics</p>
+        <p className="text-gray-500 text-lg mb-4">Failed to load analytics</p>
+        <p className="text-gray-400 mb-4">You may not have permission to access this page.</p>
+        <Link href="/">
+          <Button>Go to Home</Button>
+        </Link>
       </div>
     );
   }
@@ -229,7 +580,7 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Orders */}
-      <Card className="mt-8">
+    <Card className="mt-8">
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
         </CardHeader>
@@ -284,6 +635,405 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="space-y-10 mt-12">
+        <section id="inventory">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>{editingProductId ? "Edit Product" : "Add New Product"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form className="space-y-4" onSubmit={handleProductSubmit}>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="product-name">Name</Label>
+                      <Input
+                        id="product-name"
+                        value={productForm.name}
+                        onChange={(e) => handleProductInputChange("name", e.target.value)}
+                        placeholder="Product name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-category">Category</Label>
+                      <Input
+                        id="product-category"
+                        value={productForm.category}
+                        onChange={(e) => handleProductInputChange("category", e.target.value)}
+                        placeholder="Category"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-price">Price (KES)</Label>
+                      <Input
+                        id="product-price"
+                        type="number"
+                        step="0.01"
+                        value={productForm.price}
+                        onChange={(e) => handleProductInputChange("price", e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-stock">Stock Quantity</Label>
+                      <Input
+                        id="product-stock"
+                        type="number"
+                        min="0"
+                        value={productForm.stockQuantity}
+                        onChange={(e) => handleProductInputChange("stockQuantity", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-delivery">Delivery Price (optional)</Label>
+                      <Input
+                        id="product-delivery"
+                        type="number"
+                        step="0.01"
+                        value={productForm.deliveryPrice}
+                        onChange={(e) => handleProductInputChange("deliveryPrice", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-discount">Discount (optional)</Label>
+                      <Input
+                        id="product-discount"
+                        type="number"
+                        step="0.01"
+                        value={productForm.discount}
+                        onChange={(e) => handleProductInputChange("discount", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="product-image">Image URL</Label>
+                    <Input
+                      id="product-image"
+                      value={productForm.image}
+                      onChange={(e) => handleProductInputChange("image", e.target.value)}
+                      placeholder="https://..."
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="product-size">Size / Variant</Label>
+                    <Input
+                      id="product-size"
+                      value={productForm.size}
+                      onChange={(e) => handleProductInputChange("size", e.target.value)}
+                      placeholder="e.g. 1kg, Pack of 6"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="product-description">Description</Label>
+                    <Textarea
+                      id="product-description"
+                      rows={3}
+                      value={productForm.description}
+                      onChange={(e) => handleProductInputChange("description", e.target.value)}
+                      placeholder="Describe the product"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button type="submit" disabled={productSubmitting}>
+                      {productSubmitting
+                        ? "Saving..."
+                        : editingProductId
+                          ? "Update Product"
+                          : "Add Product"}
+                    </Button>
+                    {editingProductId && (
+                      <Button type="button" variant="outline" onClick={resetProductForm}>
+                        Cancel Edit
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Products</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isProductsLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    Loading products...
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left">
+                          <th className="py-2 px-3">Name</th>
+                          <th className="py-2 px-3">Stock</th>
+                          <th className="py-2 px-3">Price</th>
+                          <th className="py-2 px-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {products.map((product: any) => (
+                          <tr key={product.id} className="border-b border-border">
+                            <td className="py-2 px-3">
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-xs text-gray-500">{product.category}</div>
+                            </td>
+                            <td className="py-2 px-3">
+                              {product.inStock && product.stockQuantity > 0 ? (
+                                <span className="text-green-600 font-medium">
+                                  {product.stockQuantity} available
+                                </span>
+                              ) : (
+                                <span className="text-red-600 font-medium">Out of stock</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3">KSh {product.price}</td>
+                            <td className="py-2 px-3">
+                              <div className="flex flex-wrap gap-2">
+                                <Button size="xs" variant="outline" onClick={() => handleEditProduct(product)}>
+                                  <Edit className="h-3 w-3 mr-1" />
+                                  Edit
+                                </Button>
+                                <Button size="xs" variant="secondary" onClick={() => handleRestockProduct(product.id)}>
+                                  <RefreshCw className="h-3 w-3 mr-1" />
+                                  Restock
+                                </Button>
+                                <Button size="xs" variant="destructive" onClick={() => handleDeleteProduct(product.id)}>
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {products.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="py-4 text-center text-gray-500">
+                              No products found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section id="orders">
+          <Card>
+            <CardHeader>
+              <CardTitle>Orders Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isOrdersLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  Loading orders...
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map((order: any) => (
+                    <div key={order.id} className="border border-border rounded-lg p-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">Order #{order.id}</div>
+                          <div className="text-sm text-gray-500">
+                            {order.customerName} • {new Date(order.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span className="text-sm font-medium">
+                            Total: KSh {Number(order.total).toFixed(2)}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.paymentStatus)}`}>
+                            {order.paymentStatus}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.orderStatus)}`}>
+                            {order.orderStatus}
+                          </span>
+                          <Button size="sm" variant="outline" onClick={() => toggleOrderExpansion(order.id)}>
+                            {expandedOrders[order.id] ? "Hide Items" : "View Items"}
+                          </Button>
+                        </div>
+                      </div>
+                      {expandedOrders[order.id] && (
+                        <div className="mt-4 bg-muted/30 rounded-lg p-4 space-y-2">
+                          {order.items?.map((item: any) => (
+                            <div key={`${order.id}-${item.id}`} className="flex items-center justify-between text-sm">
+                              <span>{item.name}</span>
+                              <span>
+                                Qty: {item.quantity} • KSh {Number(item.price).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                          {(!order.items || order.items.length === 0) && (
+                            <div className="text-sm text-gray-500">No items recorded</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {orders.length === 0 && (
+                    <div className="text-center text-gray-500 py-6">No orders yet.</div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section id="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>Users & Loyalty</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isUsersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  Loading users...
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left">
+                        <th className="py-2 px-3">User</th>
+                        <th className="py-2 px-3">Loyalty</th>
+                        <th className="py-2 px-3">Total Spent</th>
+                        <th className="py-2 px-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user: any) => (
+                        <tr key={user.id} className="border-b border-border">
+                          <td className="py-2 px-3">
+                            <div className="font-medium">{user.name || user.username}</div>
+                            <div className="text-xs text-gray-500">{user.email || "No email"}</div>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="font-semibold">{user.loyaltyPoints ?? 0} pts</div>
+                            <div className="text-xs text-gray-500">
+                              Eligible: {user.loyaltyEligible ? "Yes" : "No"}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">KSh {Number(user.totalSpent || 0).toFixed(2)}</td>
+                          <td className="py-2 px-3">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="xs"
+                                variant={user.loyaltyEligible ? "secondary" : "outline"}
+                                onClick={() => handleToggleLoyalty(user.id, user.loyaltyEligible)}
+                                disabled={loyaltyUpdating === user.id}
+                              >
+                                {user.loyaltyEligible ? "Disable" : "Enable"}
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => handleSetPoints(user.id, user.loyaltyPoints ?? 0)}
+                                disabled={loyaltyUpdating === user.id}
+                              >
+                                Set Points
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {users.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-4 text-center text-gray-500">
+                            No users found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section id="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle>Send Notification</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-4" onSubmit={handleSendNotification}>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="notification-title">Title</Label>
+                    <Input
+                      id="notification-title"
+                      value={notificationForm.title}
+                      onChange={(e) => setNotificationForm((prev) => ({ ...prev, title: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="notification-type">Type</Label>
+                    <select
+                      id="notification-type"
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm"
+                      value={notificationForm.type}
+                      onChange={(e) => setNotificationForm((prev) => ({ ...prev, type: e.target.value }))}
+                    >
+                      <option value="info">Info</option>
+                      <option value="success">Success</option>
+                      <option value="warning">Warning</option>
+                      <option value="error">Error</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="notification-user">Target User (optional)</Label>
+                  <select
+                    id="notification-user"
+                    className="w-full border border-border rounded-md px-3 py-2 text-sm"
+                    value={notificationForm.userId}
+                    onChange={(e) => setNotificationForm((prev) => ({ ...prev, userId: e.target.value }))}
+                  >
+                    <option value="">All users</option>
+                    {users.map((user: any) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name || user.username} ({user.email || "no email"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="notification-message">Message</Label>
+                  <Textarea
+                    id="notification-message"
+                    rows={4}
+                    value={notificationForm.message}
+                    onChange={(e) => setNotificationForm((prev) => ({ ...prev, message: e.target.value }))}
+                    required
+                  />
+                </div>
+                <Button type="submit" disabled={notificationSubmitting}>
+                  {notificationSubmitting ? "Sending..." : (
+                    <span className="flex items-center gap-2">
+                      <Send className="h-4 w-4" />
+                      Send Notification
+                    </span>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </section>
+      </div>
     </div>
   );
 }

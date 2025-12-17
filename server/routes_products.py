@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db import Product, SessionLocal
+from db import Product, SessionLocal
 
 bp_products = Blueprint("products", __name__, url_prefix="/api")
 
@@ -32,7 +32,8 @@ def list_products():
                 "image": p.image,
                 "category": p.category,
                 "size": p.size,
-                "inStock": bool(p.in_stock),
+                "stockQuantity": p.stock_quantity,
+                "inStock": bool(p.in_stock) and p.stock_quantity > 0,
                 "createdAt": p.created_at.isoformat(),
             }
             for p in products
@@ -53,7 +54,8 @@ def get_product(pid: int):
             "image": product.image,
             "category": product.category,
             "size": product.size,
-            "inStock": bool(product.in_stock),
+            "stockQuantity": product.stock_quantity,
+            "inStock": bool(product.in_stock) and product.stock_quantity > 0,
             "createdAt": product.created_at.isoformat(),
         })
 
