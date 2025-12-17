@@ -20,6 +20,10 @@ def login():
         user: Optional[User] = db.query(User).filter(User.username == username).first()
         if not user or not check_password_hash(user.password_hash, password):
             return jsonify({"message": "Invalid credentials"}), 401
+        # #clear and regenrate sesson
+        # session.clear()
+        # session.regenerate()
+
         session["user_id"] = user.id
         session["username"] = user.username
         session["is_admin"] = bool(user.is_admin)
@@ -87,7 +91,7 @@ def register():
 @bp_auth.post("/logout")
 def logout():
     session.clear()
-    return jsonify({"message": "ok"})
+    return jsonify({"message": "logout successful"})
 
 
 @bp_auth.get("/me")

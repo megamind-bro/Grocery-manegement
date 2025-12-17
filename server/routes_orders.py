@@ -208,6 +208,7 @@ def _serialize_order(o: Order) -> Dict[str, Any]:
         "deliveryAddress": o.delivery_address,
         "items": o.items,
         "subtotal": f"{o.subtotal:.2f}",
+        "loyaltyPoints": user.loyalty_points or 0,
         "deliveryFee": f"{o.delivery_fee:.2f}",
         "discount": f"{o.discount:.2f}",
         "total": f"{o.total:.2f}",

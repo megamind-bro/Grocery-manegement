@@ -263,7 +263,7 @@ export default function Checkout() {
                           <FormItem>
                             <FormLabel>Phone Number</FormLabel>
                             <FormControl>
-                              <Input placeholder="+254 712 345 678" {...field} data-testid="input-phone" />
+                              <Input placeholder="254 712 345 678" {...field} data-testid="input-phone" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -474,7 +474,7 @@ export default function Checkout() {
                         <span data-testid="text-order-discount">-KSh {state.discount.toFixed(2)}</span>
                       </div>
                     )}
-                    {form.watch("useLoyaltyPoints") && form.watch("loyaltyPointsAmount") > 0 && (
+                    {form.watch("useLoyaltyPoints") && (form.watch("loyaltyPointsAmount") || 0)> 0 && (
                       <div className="flex justify-between text-blue-600">
                         <span>Loyalty Points</span>
                         <span>-KSh {((form.watch("loyaltyPointsAmount") || 0) * 0.1).toFixed(2)}</span>
