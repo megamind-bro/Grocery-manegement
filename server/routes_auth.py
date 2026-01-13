@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request, session
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import SessionLocal, User
+from db import SessionLocal, User, Order
 
 bp_auth = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -32,6 +32,7 @@ def login():
             "username": user.username,
             "name": user.name,
             "isAdmin": bool(user.is_admin),
+            "loyaltyPoints": user.loyalty_points,
         })
 
 
@@ -109,6 +110,9 @@ def me():
             "email": user.email,
             "name": user.name,
             "isAdmin": bool(user.is_admin),
+            "loyaltyPoints": user.loyalty_points,
+            "lastPhone": db.query(Order).filter(Order.user_id == uid).order_by(Order.created_at.desc()).with_entities(Order.customer_phone).limit(1).scalar(),
+            "lastAddress": db.query(Order).filter(Order.user_id == uid).order_by(Order.created_at.desc()).with_entities(Order.delivery_address).limit(1).scalar(),
         })
 
 

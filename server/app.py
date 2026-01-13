@@ -20,7 +20,10 @@ def create_app() -> Flask:
     app = Flask(__name__)
     
     # Set a secret key for session management
-    app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-key-123')  # In production, use a secure random key
+    app.secret_key = os.environ.get('FLASK_SECRET_KEY')
+    if not app.secret_key:
+        print("WARNING: FLASK_SECRET_KEY not set in environment. Using insecure default key for development.")
+        app.secret_key = 'dev-key-123'
 
     # Initialize DB schema
     Base.metadata.create_all(engine)
