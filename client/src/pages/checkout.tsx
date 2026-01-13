@@ -63,28 +63,28 @@ export default function Checkout() {
         const res = await fetch("/api/auth/me", { credentials: "include" });
         const data = await res.json();
         setMe(data);
-        
+
         // Redirect admins to dashboard
         if (data?.isAdmin) {
           navigate("/dashboard");
           return;
         }
-        
+
         // Pre-fill form with user data if available
         if (data) {
           const nameParts = (data.name || "").split(" ");
           form.reset({
             firstName: nameParts[0] || "",
             lastName: nameParts.slice(1).join(" ") || "",
-            phone: "",
+            phone: data.lastPhone || "",
             email: data.email || "",
-            address: "",
+            address: data.lastAddress || "",
             paymentMethod: "mpesa",
             useLoyaltyPoints: pointsFromCart > 0,
             loyaltyPointsAmount: pointsFromCart,
           });
         }
-      } catch {}
+      } catch { }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, pointsFromCart]);
@@ -97,11 +97,10 @@ export default function Checkout() {
     onSuccess: (order) => {
       toast({
         title: "Order placed successfully!",
-        description: `Your order #${order.id} has been placed. ${
-          order.paymentMethod === 'mpesa' 
-            ? 'Please check your phone for the M-Pesa prompt.' 
-            : 'You will receive a confirmation email shortly.'
-        }`,
+        description: `Your order #${order.id} has been placed. ${order.paymentMethod === 'mpesa'
+          ? 'Please check your phone for the M-Pesa prompt.'
+          : 'You will receive a confirmation email shortly.'
+          }`,
       });
       clearCart();
       // Redirect to account page to view order
@@ -293,7 +292,7 @@ export default function Checkout() {
                           <FormItem>
                             <FormLabel>Delivery Address</FormLabel>
                             <FormControl>
-                              <Textarea 
+                              <Textarea
                                 rows={3}
                                 placeholder="Enter your full delivery address"
                                 {...field}
@@ -372,54 +371,116 @@ export default function Checkout() {
               </Card>
 
               {/* Loyalty Points */}
-              {me?.loyaltyPoints > 0 && (
+              {(
                 <Card>
                   <CardContent className="p-6">
                     <h3 className="text-xl font-semibold mb-4">Loyalty Points</h3>
                     <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="text-sm text-gray-600">Available Points</div>
-                        <div className="text-2xl font-bold text-blue-600">{me.loyaltyPoints}</div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex justify-between items-center">
+                        <div>
+                          <div className="text-sm text-gray-600">Available Points</div>
+                          <div className="text-2xl font-bold text-blue-600">{me.loyaltyPoints}</div>
+                        </div>
+                        <div className="text-sm text-blue-800 bg-blue-100 px-3 py-1 rounded-full">
+                          100 Points = KSh 10
+                        </div>
                       </div>
+
                       <FormField
                         control={form.control}
                         name="useLoyaltyPoints"
                         render={({ field }) => (
-                          <FormItem className="flex items-center space-x-2">
+                          <FormItem className="space-y-3">
                             <FormControl>
-                              <input
-                                type="checkbox"
-                                checked={field.value}
-                                onChange={field.onChange}
-                                className="w-4 h-4 rounded"
-                              />
+                              <RadioGroup
+                                onValueChange={(val) => {
+                                  const isUsing = val !== "none";
+                                  field.onChange(isUsing);
+
+                                  if (val === "max") {
+                                    // Calculate max usable points (cannot exceed total order value or user balance)
+                                    // 1 point = 0.1 KSh, so max points for total = total * 10
+                                    const maxPointsForTotal = Math.floor(state.total * 10);
+                                    const pointsToUse = Math.min(me.loyaltyPoints, maxPointsForTotal);
+                                    form.setValue("loyaltyPointsAmount", pointsToUse);
+                                  } else if (val === "none") {
+                                    form.setValue("loyaltyPointsAmount", 0);
+                                  }
+                                  // If partial, keep existing or set to 0 initially? 
+                                  // logic handled in the input below
+                                }}
+                                defaultValue={field.value ? "partial" : "none"}
+                                className="flex flex-col md:flex-row gap-4"
+                              >
+                                <div className="flex-1 flex items-center space-x-2 p-3 border border-border rounded-lg justify-center hover:bg-slate-50 cursor-pointer h-full">
+                                  <RadioGroupItem value="none" id="lp-none" />
+                                  <label htmlFor="lp-none" className="cursor-pointer font-medium">
+                                    Do not use
+                                  </label>
+                                </div>
+
+                                <div className="flex-1 flex items-center space-x-2 p-3 border border-border rounded-lg justify-center hover:bg-slate-50 cursor-pointer h-full">
+                                  <RadioGroupItem value="max" id="lp-max" />
+                                  <label htmlFor="lp-max" className="cursor-pointer font-medium text-center">
+                                    <div className="font-medium">Use Max</div>
+                                    <div className="text-xs text-gray-500">
+                                      ({Math.min(me.loyaltyPoints, Math.floor(state.total * 10))} pts)
+                                    </div>
+                                  </label>
+                                </div>
+
+                                <div className="flex-1 flex items-center space-x-2 p-3 border border-border rounded-lg justify-center hover:bg-slate-50 cursor-pointer h-full">
+                                  <RadioGroupItem value="partial" id="lp-partial" />
+                                  <label htmlFor="lp-partial" className="cursor-pointer font-medium">
+                                    Custom
+                                  </label>
+                                </div>
+                              </RadioGroup>
                             </FormControl>
-                            <label className="text-sm font-medium cursor-pointer">
-                              Use loyalty points for this order
-                            </label>
+                            {(me.loyaltyPoints || 0) <= 0 && (
+                              <p className="text-sm text-red-500 mt-2">You do not have enough points to redeem.</p>
+                            )}
                           </FormItem>
                         )}
                       />
+
                       {form.watch("useLoyaltyPoints") && (
-                        <FormField
-                          control={form.control}
-                          name="loyaltyPointsAmount"
-                          render={({ field }) => (
-                            <FormItem>
-                              <label className="text-sm font-medium">Points to use (100 points = KSh 10)</label>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max={Math.min(me.loyaltyPoints, Math.floor(state.total * 10))}
-                                  {...field}
-                                  onChange={(e) => field.onChange(Number(e.target.value))}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        <div className="pl-4 border-l-2 border-border ml-2">
+                          <FormField
+                            control={form.control}
+                            name="loyaltyPointsAmount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <label className="text-sm font-medium">Points to Redeem</label>
+                                <FormControl>
+                                  <div className="flex items-center space-x-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max={Math.min(me.loyaltyPoints, Math.floor(state.total * 10))}
+                                      {...field}
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        // Enforce limits
+                                        const max = Math.min(me.loyaltyPoints, Math.floor(state.total * 10));
+                                        if (val > max) {
+                                          field.onChange(max);
+                                        } else {
+                                          field.onChange(val);
+                                        }
+                                      }}
+                                      className="w-32"
+                                    />
+                                    <span className="text-sm text-gray-500">
+                                      = KSh {(field.value || 0) * 0.1}
+                                    </span>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       )}
                     </div>
                   </CardContent>
@@ -458,7 +519,7 @@ export default function Checkout() {
                   </div>
 
                   <hr className="my-4 border-border" />
-                  
+
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
@@ -474,7 +535,7 @@ export default function Checkout() {
                         <span data-testid="text-order-discount">-KSh {state.discount.toFixed(2)}</span>
                       </div>
                     )}
-                    {form.watch("useLoyaltyPoints") && (form.watch("loyaltyPointsAmount") || 0)> 0 && (
+                    {form.watch("useLoyaltyPoints") && (form.watch("loyaltyPointsAmount") || 0) > 0 && (
                       <div className="flex justify-between text-blue-600">
                         <span>Loyalty Points</span>
                         <span>-KSh {((form.watch("loyaltyPointsAmount") || 0) * 0.1).toFixed(2)}</span>

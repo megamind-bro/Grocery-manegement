@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 
 export default function Header() {
   const [location, navigate] = useLocation();
-  const { state } = useCart();
+  const { state, refreshCart } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
   const [me, setMe] = useState(null);
 
@@ -16,7 +16,7 @@ export default function Header() {
         const res = await fetch("/api/auth/me", { credentials: "include" });
         const data = await res.json();
         setMe(data);
-      } catch {}
+      } catch { }
     })();
   }, [location]); // Refresh when location changes (e.g., after login)
 
@@ -59,11 +59,10 @@ export default function Header() {
           <nav className="flex items-center space-x-6">
             <Link
               href="/"
-              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                location === "/"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${location === "/"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <i className="fas fa-home"></i>
               <span>Landing</span>
@@ -109,6 +108,7 @@ export default function Header() {
                 onClick={async () => {
                   await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
                   setMe(null);
+                  refreshCart();
                   navigate("/");
                 }}
                 className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
