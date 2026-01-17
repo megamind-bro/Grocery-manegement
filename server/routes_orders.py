@@ -214,39 +214,129 @@ def list_orders():
         return jsonify([_serialize_order(o) for o in orders])
 
 
+    return jsonify({"message": "Callback received"}), 200
+
+
+@bp_orders.post("/orders/<int:order_id>/cancel")
+def cancel_order(order_id: int):
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    with SessionLocal() as db:
+        order = db.query(Order).get(order_id)
+        if not order:
+            return jsonify({"message": "Order not found"}), 404
+        
+        if order.user_id != user_id:
+            return jsonify({"message": "Unauthorized"}), 403
+            
+        if order.payment_status != "pending":
+            return jsonify({"message": "Cannot cancel order that is not pending"}), 400
+
+        # Restore stock
+        items = json.loads(order.items)
+        for item in items:
+            product = db.query(Product).get(item["id"])
+            if product:
+                product.stock_quantity += item["quantity"]
+                product.in_stock = product.stock_quantity > 0
+        
+        order.order_status = "cancelled"
+        order.payment_status = "cancelled"
+        db.commit()
+        
+        return jsonify({"message": "Order cancelled successfully"})
+
+
+@bp_orders.post("/orders/<int:order_id>/pay")
+def retry_payment(order_id: int):
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    with SessionLocal() as db:
+        order = db.query(Order).get(order_id)
+        if not order:
+            return jsonify({"message": "Order not found"}), 404
+        
+        if order.user_id != user_id:
+            return jsonify({"message": "Unauthorized"}), 403
+            
+        if order.payment_status != "pending":
+             return jsonify({"message": "Order is not pending payment"}), 400
+             
+        # Retry STK Push
+        phone = order.customer_phone
+        if phone.startswith("0"):
+            phone = "254" + phone[1:]
+        elif not phone.startswith("254"):
+            phone = "254" + phone
+            
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(
+                initiate_stk_push(str(order.id), phone, float(order.total))
+            )
+            loop.close()
+            
+            if isinstance(result, dict):
+                checkout_req_id = result.get('CheckoutRequestID')
+                if checkout_req_id:
+                     order.mpesa_transaction_id = f"REQ:{checkout_req_id}"
+                     db.commit()
+                     
+            return jsonify({"message": "Payment initiated successfully"})
+        except Exception as e:
+            return jsonify({"message": f"Payment retry failed: {str(e)}"}), 500
+
+
 @bp_orders.post("/mpesa/callback")
 def mpesa_callback():
     body = request.get_json(force=True) or {}
     try:
         stk = body["Body"]["stkCallback"]
         checkout_req_id = stk.get("CheckoutRequestID")
+        result_code = stk.get("ResultCode")
     except Exception:
         return jsonify({"message": "Bad callback"}), 400
 
-    if stk.get("ResultCode") == 0:
-        receipt = None
-        for item in stk.get("CallbackMetadata", {}).get("Item", []):
-            if item.get("Name") == "MpesaReceiptNumber":
-                receipt = item.get("Value")
-                break
+    with SessionLocal() as session:
+        # Find order by Request ID
+        o = session.query(Order).filter(Order.mpesa_transaction_id == f"REQ:{checkout_req_id}").first()
         
-        if receipt and checkout_req_id:
-            with SessionLocal() as session:  # type: Session
-                # Find order by the stored Request ID
-                # We stored it as "REQ:{checkout_req_id}"
-                o = session.query(Order).filter(Order.mpesa_transaction_id == f"REQ:{checkout_req_id}").first()
-                
-                # Fallback to old method if not found (for backward compatibility during deploy)
-                if not o:
-                     o = session.query(Order).filter(Order.payment_status == "pending", Order.payment_method == "mpesa").order_by(Order.created_at.desc()).first()
+        # Fallback if request ID not found (legacy)
+        if not o and result_code == 0: 
+             o = session.query(Order).filter(Order.payment_status == "pending", Order.payment_method == "mpesa").order_by(Order.created_at.desc()).first()
 
-                if o:
+        if o:
+            if result_code == 0:
+                receipt = None
+                for item in stk.get("CallbackMetadata", {}).get("Item", []):
+                    if item.get("Name") == "MpesaReceiptNumber":
+                        receipt = item.get("Value")
+                        break
+                
+                if receipt:
                     o.payment_status = "completed"
+                    o.order_status = "paid" # Update order status to paid as well per requirement
                     o.mpesa_transaction_id = receipt
                     session.commit()
                     logger.info(f"Payment confirmed for order {o.id}, Receipt: {receipt}")
-                else:
-                    logger.warning(f"Order not found for M-Pesa callback. ReqID: {checkout_req_id}")
+            else:
+                 # Handle failure
+                 # Don't cancel, just mark as failed or leave pending?
+                 # User asked: "if not it says pending" -> imply we might leave it or explicit 'payment_failed'
+                 # But let's log it clearly.
+                 # To allow retry without confusion, 'pending' is fine, but maybe 'failed' status helps UI show 'Retry'?
+                 # Let's keep it 'pending' as per user words "if not it says pending", but we can log failure meta if needed.
+                 # Actually, if we want to show it failed, we can set payment_status='failed' and 'Retry' button shows up.
+                 # But user said "if not it says pending", so I will strictly follow that for now, 
+                 # BUT I will update the logging.
+                 logger.warning(f"Payment failed for order {o.id}. Code: {result_code}, Desc: {stk.get('ResultDesc')}")
+        else:
+            logger.warning(f"Order not found for M-Pesa callback. ReqID: {checkout_req_id}")
 
     return jsonify({"message": "Callback received"}), 200
 

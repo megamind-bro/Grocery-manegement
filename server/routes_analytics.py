@@ -13,7 +13,8 @@ bp_analytics = Blueprint("analytics", __name__, url_prefix="/api")
 def analytics():
     with SessionLocal() as session:  # type: Session
         orders = session.query(Order).all()
-        completed = [o for o in orders if o.payment_status == "completed"]
+        # Include 'completed' and 'paid' statuses
+        completed = [o for o in orders if o.payment_status in ["completed", "paid", "success"]]
         total_revenue = sum(float(o.total) for o in completed)
         total_orders = len(orders)
         avg_order_value = (total_revenue / total_orders) if total_orders else 0.0

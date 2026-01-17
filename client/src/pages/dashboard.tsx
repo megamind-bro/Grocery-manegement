@@ -128,18 +128,24 @@ export default function Dashboard() {
     queryKey: ["admin-products"],
     enabled: !!me?.isAdmin,
     queryFn: () => fetchJson("/api/products"),
+    queryFn: () => fetchJson("/api/products"),
+    refetchInterval: 30000,
   });
 
   const ordersQuery = useQuery<any[]>({
     queryKey: ["admin-orders"],
     enabled: !!me?.isAdmin,
     queryFn: () => fetchJson("/api/admin/orders"),
+    queryFn: () => fetchJson("/api/admin/orders"),
+    refetchInterval: 30000,
   });
 
   const usersQuery = useQuery<any[]>({
     queryKey: ["admin-users"],
     enabled: !!me?.isAdmin,
     queryFn: () => fetchJson("/api/admin/users"),
+    queryFn: () => fetchJson("/api/admin/users"),
+    refetchInterval: 30000,
   });
 
   const { data: analytics, isLoading, error } = useQuery<AnalyticsData>({
@@ -153,15 +159,16 @@ export default function Dashboard() {
       }
       return res.json();
     },
+    refetchInterval: 30000,
   });
 
   const products = productsQuery.data || [];
   const orders = ordersQuery.data || [];
   const users = usersQuery.data || [];
 
-  const isProductsLoading = productsQuery.isLoading || productsQuery.isFetching;
-  const isOrdersLoading = ordersQuery.isLoading || ordersQuery.isFetching;
-  const isUsersLoading = usersQuery.isLoading || usersQuery.isFetching;
+  const isProductsLoading = productsQuery.isLoading;
+  const isOrdersLoading = ordersQuery.isLoading;
+  const isUsersLoading = usersQuery.isLoading;
 
   const handleProductInputChange = (field: keyof ProductFormState, value: string) => {
     // Prevent negative values for number fields
@@ -169,12 +176,12 @@ export default function Dashboard() {
       const numValue = parseFloat(value);
       if (numValue < 0) return; // Don't update if negative
     }
-    
+
     // Update image preview when image URL changes
     if (field === 'image') {
       setImagePreview(value || null);
     }
-    
+
     setProductForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -201,7 +208,7 @@ export default function Dashboard() {
     setEditingProductId(product.id);
     setProductForm(productToFormState(product));
     setImagePreview(product.image || null);
-    
+
     // Scroll to form after a small delay to allow state to update
     setTimeout(() => {
       formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -282,44 +289,44 @@ export default function Dashboard() {
       });
       return;
     }
-    
+
     setRestockingProduct(productId);
     try {
       const response = await fetchJson(`/api/admin/products/${productId}/restock`, {
         method: "POST",
         body: JSON.stringify({ quantity }),
       });
-      
+
       // Update the product in the cache with all fields from the response
       queryClient.setQueryData(['admin-products'], (oldData: any[] | undefined) => {
         if (!oldData) return oldData;
-        return oldData.map(product => 
-          product.id === productId 
-            ? { 
-                ...product,
-                ...response, // Spread all fields from the response
-                // Ensure we have all required fields with defaults
-                stockQuantity: response.stockQuantity || 0,
-                inStock: response.inStock || false,
-                deliveryPrice: response.deliveryPrice || 0,
-                discount: response.discount || 0,
-                price: response.price || 0,
-                name: response.name || product.name,
-                description: response.description || product.description,
-                image: response.image || product.image,
-                category: response.category || product.category,
-                size: response.size || product.size
-              }
+        return oldData.map(product =>
+          product.id === productId
+            ? {
+              ...product,
+              ...response, // Spread all fields from the response
+              // Ensure we have all required fields with defaults
+              stockQuantity: response.stockQuantity || 0,
+              inStock: response.inStock || false,
+              deliveryPrice: response.deliveryPrice || 0,
+              discount: response.discount || 0,
+              price: response.price || 0,
+              name: response.name || product.name,
+              description: response.description || product.description,
+              image: response.image || product.image,
+              category: response.category || product.category,
+              size: response.size || product.size
+            }
             : product
         );
       });
-      
+
       // If we're currently editing this product, update the form
       if (editingProductId === productId) {
         setProductForm(productToFormState(response));
       }
-      
-      toast({ 
+
+      toast({
         title: "Stock updated",
         description: `Successfully added ${quantity} items to stock. New stock level: ${response.stockQuantity}`,
         variant: "success"
@@ -397,7 +404,7 @@ export default function Dashboard() {
       setUserOrders([]);
       return;
     }
-    
+
     try {
       const orders = await fetchJson(`/api/admin/users/${userId}/orders`);
       setSelectedUserId(userId);
@@ -508,9 +515,9 @@ export default function Dashboard() {
 
   const getStatusColor = (status?: string | null) => {
     if (!status) return 'bg-gray-100 text-gray-800';
-    
+
     const statusLower = status.toLowerCase();
-    
+
     switch (statusLower) {
       case 'completed':
       case 'delivered':
@@ -538,12 +545,21 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Manager Dashboard</h1>
           <p className="text-gray-600 mt-1">Monitor your store performance and analytics</p>
         </div>
-        <Link href="/">
-          <Button variant="outline" data-testid="button-back-to-store">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Store
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => {
+            queryClient.invalidateQueries();
+            toast({ title: "Refreshing data..." });
+          }}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
           </Button>
-        </Link>
+          <Link href="/">
+            <Button variant="outline" data-testid="button-back-to-store">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Store
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Key Metrics */}
@@ -640,7 +656,7 @@ export default function Dashboard() {
               {/* Simple bar chart visualization */}
               {[120, 140, 100, 180, 160, 200].map((height, index) => (
                 <div key={index} className="flex flex-col items-center space-y-2">
-                  <div 
+                  <div
                     className="w-8 bg-primary rounded-t"
                     style={{ height: `${height}px` }}
                   ></div>
@@ -681,7 +697,7 @@ export default function Dashboard() {
                       KSh {product.revenue.toLocaleString()}
                     </p>
                     <div className="w-16 bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-primary h-2 rounded-full"
                         style={{ width: `${Math.max(20, (index + 1) * 15)}%` }}
                       ></div>
@@ -695,7 +711,7 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Orders */}
-    <Card className="mt-8">
+      <Card className="mt-8">
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
         </CardHeader>
@@ -725,7 +741,7 @@ export default function Dashboard() {
                       KSh {parseFloat(order.total).toFixed(2)}
                     </td>
                     <td className="py-3 px-4">
-                      <span 
+                      <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.paymentStatus)}`}
                         data-testid={`text-order-payment-status-${order.id}`}
                       >
@@ -733,7 +749,7 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span 
+                      <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.orderStatus)}`}
                         data-testid={`text-order-status-${order.id}`}
                       >
@@ -835,9 +851,9 @@ export default function Dashboard() {
                     {imagePreview && (
                       <div className="mt-2">
                         <div className="text-sm text-gray-500 mb-1">Preview:</div>
-                        <img 
-                          src={imagePreview} 
-                          alt="Preview" 
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
                           className="h-32 w-32 object-cover rounded-md border"
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
@@ -927,9 +943,9 @@ export default function Dashboard() {
                                   <Edit className="h-3 w-3 mr-1" />
                                   Edit
                                 </Button>
-                                <Button 
-                                  size="xs" 
-                                  variant="secondary" 
+                                <Button
+                                  size="xs"
+                                  variant="secondary"
                                   onClick={() => handleRestockProduct(product.id)}
                                   disabled={restockingProduct === product.id}
                                 >
@@ -1013,7 +1029,7 @@ export default function Dashboard() {
                             </div>
                             {order.user && (
                               <div className="text-xs text-blue-600 mt-2">
-                                <span className="font-medium">User ID:</span> {order.user.id} • 
+                                <span className="font-medium">User ID:</span> {order.user.id} •
                                 <span className="font-medium ml-2">Loyalty Points:</span> {order.user.loyaltyPoints || 0}
                               </div>
                             )}
@@ -1072,7 +1088,7 @@ export default function Dashboard() {
                               <div className="text-sm text-gray-500">No items recorded</div>
                             )}
                           </div>
-                          
+
                           <div className="border-t border-border pt-3">
                             <h4 className="font-semibold text-sm mb-2">Order Summary</h4>
                             <div className="space-y-1 text-sm">

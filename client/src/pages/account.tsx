@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, MapPin, CreditCard, Bell, HelpCircle, LogOut, Package, Settings } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Account() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [me, setMe] = useState(null);
   const [profile, setProfile] = useState({
     name: "",
@@ -123,6 +124,38 @@ export default function Account() {
     }
   };
 
+  const handleCancelOrder = async (orderId: number) => {
+    if (!confirm("Are you sure you want to cancel this order?")) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include"
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast({ title: "Order Cancelled", description: data.message });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleRetryPayment = async (orderId: number) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include"
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast({ title: "Payment Initiated", description: "M-Pesa STK Push sent to your phone." });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
   if (!me) {
     return (
       <div className="flex justify-center items-center py-16">
@@ -152,59 +185,53 @@ export default function Account() {
               <div className="space-y-2">
                 <button
                   onClick={() => setActiveMenu("profile")}
-                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${
-                    activeMenu === "profile" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${activeMenu === "profile" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
+                    }`}
                 >
                   <Settings className="h-5 w-5" />
                   <span>Profile Information</span>
                 </button>
                 <button
                   onClick={() => setActiveMenu("orders")}
-                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${
-                    activeMenu === "orders" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${activeMenu === "orders" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
+                    }`}
                 >
                   <Package className="h-5 w-5" />
                   <span>Order History</span>
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveMenu("addresses")}
-                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${
-                    activeMenu === "addresses" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${activeMenu === "addresses" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
+                    }`}
                 >
                   <MapPin className="h-5 w-5" />
                   <span>Delivery Addresses</span>
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveMenu("payment")}
-                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${
-                    activeMenu === "payment" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${activeMenu === "payment" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
+                    }`}
                 >
                   <CreditCard className="h-5 w-5" />
                   <span>Payment Methods</span>
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveMenu("notifications")}
-                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${
-                    activeMenu === "notifications" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${activeMenu === "notifications" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
+                    }`}
                 >
                   <Bell className="h-5 w-5" />
                   <span>Notifications</span>
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveMenu("help")}
-                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${
-                    activeMenu === "help" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${activeMenu === "help" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
+                    }`}
                 >
                   <HelpCircle className="h-5 w-5" />
                   <span>Help & Support</span>
                 </button>
-                <button 
+                <button
                   onClick={async () => {
                     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
                     navigate("/");
@@ -299,13 +326,12 @@ export default function Account() {
                             <div className="text-right">
                               <p className="font-semibold">KSh {parseFloat(order.total).toFixed(2)}</p>
                               <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  order.orderStatus === "delivered"
-                                    ? "bg-green-100 text-green-800"
-                                    : order.orderStatus === "processing"
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${order.orderStatus === "delivered"
+                                  ? "bg-green-100 text-green-800"
+                                  : order.orderStatus === "processing"
                                     ? "bg-blue-100 text-blue-800"
                                     : "bg-yellow-100 text-yellow-800"
-                                }`}
+                                  }`}
                               >
                                 {order.orderStatus}
                               </span>
@@ -319,6 +345,13 @@ export default function Account() {
                           <div className="text-xs text-gray-500">
                             Payment: {order.paymentStatus} | Method: {order.paymentMethod}
                           </div>
+
+                          {order.paymentStatus === "pending" && order.orderStatus !== "cancelled" && (
+                            <div className="flex space-x-2 mt-3 justify-end pt-2 border-t border-gray-100">
+                              <Button variant="outline" size="sm" onClick={() => handleCancelOrder(order.id)} className="text-red-600 border-red-200 hover:bg-red-50">Cancel Order</Button>
+                              <Button size="sm" onClick={() => handleRetryPayment(order.id)}>Retry Payment</Button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -399,7 +432,7 @@ export default function Account() {
                       let details = null;
                       try {
                         details = pm.details ? JSON.parse(pm.details) : null;
-                      } catch {}
+                      } catch { }
                       return (
                         <div key={pm.id} className="border border-border rounded-lg p-4">
                           <div className="flex items-start justify-between">
