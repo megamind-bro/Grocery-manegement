@@ -28,6 +28,16 @@ const checkoutSchema = z.object({
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 export default function Checkout() {
   const { state, clearCart } = useCart();
   const { toast } = useToast();
@@ -35,6 +45,8 @@ export default function Checkout() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [me, setMe] = useState<any>(null);
   const [pointsFromCart, setPointsFromCart] = useState(0);
+  const [showMpesaPrompt, setShowMpesaPrompt] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState<any>(null);
 
   const form = useForm<CheckoutForm>({
     resolver: zodResolver(checkoutSchema),
@@ -95,18 +107,19 @@ export default function Checkout() {
       return response.json();
     },
     onSuccess: (order) => {
-      toast({
-        title: "Order placed successfully!",
-        description: `Your order #${order.id} has been placed. ${order.paymentMethod === 'mpesa'
-          ? 'Please check your phone for the M-Pesa prompt.'
-          : 'You will receive a confirmation email shortly.'
-          }`,
-      });
       clearCart();
-      // Redirect to account page to view order
-      setTimeout(() => {
-        navigate("/account");
-      }, 2000);
+      if (order.paymentMethod === 'mpesa') {
+        setCurrentOrder(order);
+        setShowMpesaPrompt(true);
+      } else {
+        toast({
+          title: "Order placed successfully!",
+          description: "You will receive a confirmation email shortly.",
+        });
+        setTimeout(() => {
+          navigate("/account");
+        }, 2000);
+      }
     },
     onError: (error) => {
       toast({
@@ -116,6 +129,11 @@ export default function Checkout() {
       });
     },
   });
+
+  const handleMpesaConfirm = () => {
+    setShowMpesaPrompt(false);
+    navigate("/account");
+  };
 
   const onSubmit = async (data: CheckoutForm) => {
     if (me?.isAdmin) {
@@ -192,7 +210,7 @@ export default function Checkout() {
     );
   }
 
-  if (state.items.length === 0) {
+  if (state.items.length === 0 && !showMpesaPrompt) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-16">
@@ -580,6 +598,24 @@ export default function Checkout() {
           </div>
         </form>
       </Form>
+
+      <AlertDialog open={showMpesaPrompt} onOpenChange={setShowMpesaPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Check your phone</AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-gray-700">
+              A payment request for <span className="font-semibold">KSh {currentOrder?.total}</span> has been sent to your M-Pesa number <span className="font-semibold">{currentOrder?.customerPhone}</span>.
+              <br /><br />
+              Please unlock your phone and enter your M-Pesa PIN to complete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleMpesaConfirm}>
+              I have entered my PIN
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
