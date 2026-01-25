@@ -57,6 +57,7 @@ export default function Account() {
       }
       return res.json();
     },
+    refetchInterval: 5000,
   });
 
   // Fetch saved addresses
