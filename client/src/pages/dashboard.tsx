@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, TrendingUp, ShoppingBag, Calculator, Users, Trash2, Edit, RefreshCw, Send } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface AnalyticsData {
   totalRevenue: number;
@@ -30,6 +31,10 @@ interface AnalyticsData {
     paymentStatus: string;
     orderStatus: string;
     createdAt: string;
+  }>;
+  weeklySales: Array<{
+    date: string;
+    sales: number;
   }>;
 }
 
@@ -652,19 +657,25 @@ export default function Dashboard() {
             <CardTitle>Sales Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-end justify-between space-x-2">
-              {/* Simple bar chart visualization */}
-              {[120, 140, 100, 180, 160, 200].map((height, index) => (
-                <div key={index} className="flex flex-col items-center space-y-2">
-                  <div
-                    className="w-8 bg-primary rounded-t"
-                    style={{ height: `${height}px` }}
-                  ></div>
-                  <span className="text-xs text-gray-600">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][index]}
-                  </span>
-                </div>
-              ))}
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analytics.weeklySales}>
+                  <XAxis
+                    dataKey="date"
+                    fontSize={12}
+                    tickFormatter={(value) => new Date(value).toLocaleDateString(undefined, { weekday: 'short' })}
+                  />
+                  <YAxis
+                    fontSize={12}
+                    tickFormatter={(value) => `KSh ${value}`}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`KSh ${value.toLocaleString()}`, 'Sales']}
+                    labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                  />
+                  <Bar dataKey="sales" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>

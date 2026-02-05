@@ -37,7 +37,7 @@ export default function Header() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Leaf className="text-white h-5 w-5" />
               </div>
-              <span className="text-xl font-bold text-foreground">GrocerySync</span>
+              <span className="text-xl font-bold text-foreground">Dekut Farm</span>
             </Link>
           </div>
 
@@ -65,7 +65,7 @@ export default function Header() {
                 }`}
             >
               <i className="fas fa-home"></i>
-              <span>Landing</span>
+              <span>Home</span>
             </Link>
 
             {!me?.isAdmin && (
