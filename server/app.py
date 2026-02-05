@@ -14,6 +14,7 @@ from routes_auth import bp_auth
 from routes_admin import bp_admin
 from routes_profile import bp_profile
 from routes_cart import bp_cart
+from routes_notifications import bp_notifications
 
 
 def create_app() -> Flask:
@@ -37,6 +38,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_admin)
     app.register_blueprint(bp_profile)
     app.register_blueprint(bp_cart)
+    app.register_blueprint(bp_notifications)
 
     return app
 

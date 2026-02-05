@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta
 from flask import Blueprint, jsonify
 from sqlalchemy.orm import Session
 
 from db import Order, SessionLocal
+
 
 bp_analytics = Blueprint("analytics", __name__, url_prefix="/api")
 
@@ -56,6 +58,20 @@ def analytics():
             }
             for o in orders[:10]
         ]
+        
+        # Calculate Weekly Sales
+        today = datetime.utcnow().date()
+        weekly_sales = []
+        for i in range(6, -1, -1):
+            date_val = today - timedelta(days=i)
+            # Filter orders for this day (and completed)
+            day_orders = [o for o in completed if o.created_at.date() == date_val]
+            day_revenue = sum(float(o.total) for o in day_orders)
+            weekly_sales.append({
+                "date": date_val.strftime("%Y-%m-%d"),
+                "sales": day_revenue
+            })
+
 
         return jsonify({
             "totalRevenue": total_revenue,
@@ -63,6 +79,9 @@ def analytics():
             "avgOrderValue": avg_order_value,
             "activeCustomers": active_customers,
             "topProducts": top_products,
+            "activeCustomers": active_customers,
+            "topProducts": top_products,
             "recentOrders": recent,
+            "weeklySales": weekly_sales,
         })
 

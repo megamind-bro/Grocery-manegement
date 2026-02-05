@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request, session
 from sqlalchemy.orm import Session
 
 from auth import require_firebase_auth
-from db import Order, Product, DeliveryAddress, PaymentMethod, User, SessionLocal
+from db import Order, Product, DeliveryAddress, PaymentMethod, User, Notification, SessionLocal
 from mpesa import initiate_stk_push
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,19 @@ def create_order():
             # Deduct stock
             product.stock_quantity -= quantity
             product.in_stock = product.stock_quantity > 0
+            
+            # Check for Low Stock (Reorder Logic)
+            if product.stock_quantity <= 5:
+                # Check if notification already exists for this product today (optional, to avoid spam)
+                # For simplicity, we'll just add it. Admin can clear them.
+                notification = Notification(
+                    title="Low Stock Alert",
+                    message=f"Product '{product.name}' is low on stock ({product.stock_quantity} remaining). Please reorder.",
+                    type="warning",
+                    user_id=None # None means visible to all admins or system-wide
+                )
+                db.add(notification)
+
             
             # Calculate item total
             price = float(product.price)
