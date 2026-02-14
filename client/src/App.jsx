@@ -12,6 +12,7 @@ import Dashboard from "@/pages/dashboard";
 import Profiles from "@/pages/profiles";
 import Login from "@/pages/login";
 import Account from "@/pages/account";
+import ForecastPage from "@/pages/forecast_page";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TermsOfService from "@/pages/terms-of-service";
 import CookiePolicy from "@/pages/cookie-policy";
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/checkout" component={Checkout} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/profiles" component={Profiles} />
+        <Route path="/admin/forecast" component={ForecastPage} />
         <Route path="/login" component={Login} />
         <Route path="/account" component={Account} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />
@@ -34,7 +36,7 @@ function Router() {
         <Route path="/cookie-policy" component={CookiePolicy} />
         <Route component={NotFound} />
       </Switch>
-      
+
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,7 +50,7 @@ function Router() {
               </div>
               <p className="text-gray-400">Your trusted partner for fresh groceries delivered to your doorstep.</p>
             </div>
-            
+
             <div>
               <h4 className="font-semibold mb-4">Quick Links</h4>
               <ul className="space-y-2 text-gray-400">
@@ -58,7 +60,7 @@ function Router() {
                 <li><Link href="/" className="hover:text-white transition-colors cursor-pointer">Blog</Link></li>
               </ul>
             </div>
-            
+
             <div>
               <h4 className="font-semibold mb-4">Customer Service</h4>
               <ul className="space-y-2 text-gray-400">
@@ -68,7 +70,7 @@ function Router() {
                 <li><Link href="/account" className="hover:text-white transition-colors cursor-pointer">Shipping Info</Link></li>
               </ul>
             </div>
-            
+
             <div>
               <h4 className="font-semibold mb-4">Connect With Us</h4>
               <div className="flex space-x-4">
@@ -87,16 +89,16 @@ function Router() {
               </div>
             </div>
           </div>
-          
+
           <hr className="border-gray-800 my-8" />
-          
+
           <div className="flex flex-col md:flex-row justify-between items-center">
-              <p className="text-gray-400">© 2024 GrocerySync. All rights reserved.</p>
-              <div className="flex space-x-6 mt-4 md:mt-0">
-                <Link href="/privacy-policy" className="text-gray-400 hover:text-white transition-colors text-sm cursor-pointer">Privacy Policy</Link>
-                <Link href="/terms-of-service" className="text-gray-400 hover:text-white transition-colors text-sm cursor-pointer">Terms of Service</Link>
-                <Link href="/cookie-policy" className="text-gray-400 hover:text-white transition-colors text-sm cursor-pointer">Cookie Policy</Link>
-              </div>
+            <p className="text-gray-400">© 2024 GrocerySync. All rights reserved.</p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <Link href="/privacy-policy" className="text-gray-400 hover:text-white transition-colors text-sm cursor-pointer">Privacy Policy</Link>
+              <Link href="/terms-of-service" className="text-gray-400 hover:text-white transition-colors text-sm cursor-pointer">Terms of Service</Link>
+              <Link href="/cookie-policy" className="text-gray-400 hover:text-white transition-colors text-sm cursor-pointer">Cookie Policy</Link>
+            </div>
           </div>
         </div>
       </footer>
