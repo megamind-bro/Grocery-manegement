@@ -73,6 +73,7 @@ def analytics():
             })
 
 
+
         return jsonify({
             "totalRevenue": total_revenue,
             "totalOrders": total_orders,
@@ -84,4 +85,44 @@ def analytics():
             "recentOrders": recent,
             "weeklySales": weekly_sales,
         })
+
+
+@bp_analytics.get("/analytics/history")
+def analytics_history():
+    with SessionLocal() as session:
+        # Get orders from last 90 days
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=90)
+        
+        orders = session.query(Order).filter(
+            Order.created_at >= start_date,
+            Order.payment_status.in_(["completed", "paid", "success"])
+        ).all()
+        
+        daily_data = {}
+        for o in orders:
+            d_str = o.created_at.strftime("%Y-%m-%d")
+            if d_str not in daily_data:
+                daily_data[d_str] = {"sales": 0.0, "orders": 0}
+            daily_data[d_str]["sales"] += float(o.total)
+            daily_data[d_str]["orders"] += 1
+            
+        result = []
+        current = start_date
+        while current <= end_date:
+            d_str = current.strftime("%Y-%m-%d")
+            val = daily_data.get(d_str, {"sales": 0.0, "orders": 0})
+            
+            # Format date for frontend (e.g. "Oct 1")
+            formatted_date = current.strftime("%b %d").replace(" 0", " ")
+            
+            result.append({
+                "date": formatted_date,
+                "value": val["sales"],
+                "orderCount": val["orders"],
+                "type": "actual"
+            })
+            current += timedelta(days=1)
+            
+        return jsonify(result)
 
