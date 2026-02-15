@@ -551,6 +551,12 @@ export default function Dashboard() {
           <p className="text-gray-600 mt-1">Monitor your store performance and analytics</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/admin/forecast">
+            <Button variant="outline">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Forecast
+            </Button>
+          </Link>
           <Button variant="outline" onClick={() => {
             queryClient.invalidateQueries();
             toast({ title: "Refreshing data..." });
