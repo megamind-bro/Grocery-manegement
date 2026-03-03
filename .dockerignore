@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.env
+.windsurf/
+.vscode/
+.codeviz/
+.git/
+.gitignore
+
+# Python specifics
+server/env/
+server/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite database (should be handled via volumes in production, don't copy local db file into image to avoid overwriting)
+grocery.db
+grocery.db.bak
+
+# Docker specifics
+docker-compose*.yml
+Dockerfile*
